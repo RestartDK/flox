@@ -4,7 +4,7 @@ patterns. Use this when you want direct API access with streaming; for full
 agentic loops with file tools use `claude-agent-sdk` (pip install claude-agent-sdk).
 
 Usage:
-    from alveslib.agent import ask, stream, Agent
+    from shacklib.agent import ask, stream, Agent
 
     # One-shot
     reply = ask("Summarize this data: ...")

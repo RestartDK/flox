@@ -3,7 +3,7 @@
   "root": "apps/worker",
   "sourceRoot": "apps/worker",
   "projectType": "application",
-  "implicitDependencies": ["alveslib"],
+  "implicitDependencies": ["shacklib"],
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

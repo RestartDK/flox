@@ -1,4 +1,4 @@
-from alveslib import get_logger
+from shacklib import get_logger
 
 
 def main():

@@ -4,7 +4,7 @@ python-dotenv
 requests
 tqdm
 
-# Logging (alveslib)
+# Logging (shacklib)
 python-logging-loki
 
 # Backend (fastapi or flask)
@@ -18,7 +18,7 @@ pydantic
 celery[redis]
 redis
 
-# Scraper (alveslib)
+# Scraper (shacklib)
 seleniumbase
 beautifulsoup4
 

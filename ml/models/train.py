@@ -7,7 +7,7 @@ import yaml
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 
-from alveslib import get_logger
+from shacklib import get_logger
 from ml.models.arch import Model
 
 logger = get_logger("ml-train")

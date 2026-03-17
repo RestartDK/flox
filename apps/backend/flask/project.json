@@ -3,7 +3,7 @@
   "root": "apps/backend/flask",
   "sourceRoot": "apps/backend/flask",
   "projectType": "application",
-  "implicitDependencies": ["alveslib"],
+  "implicitDependencies": ["shacklib"],
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

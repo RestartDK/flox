@@ -23,13 +23,13 @@ This template is AI native and platform agnostic and meant to be effortlessly de
 
 ###### Logging
 1. Grafana to view (must be configured by adding loki url with "http://loki:31000")
-2. For now just python directly adds the logs to loki (via the alveslib package)
+2. For now just python directly adds the logs to loki (via the shacklib package)
 
 ```python
-from alveslib import get_logger
+from shacklib import get_logger
 logger = get_logger("service") # if you are writing contents for logs or any relevant prints do not use emojis in any debug statements or logs.
 ```
-FOR REFERENCE ALL OTHER REUSABLE MODULES LIKE THIS SHOULD BE DEFINED THE SAME WAY IN THE ALVESLIB package - if used in python.
+FOR REFERENCE ALL OTHER REUSABLE MODULES LIKE THIS SHOULD BE DEFINED THE SAME WAY IN THE SHACKLIB package - if used in python.
 Using lazydocker to manager containers...
 
 ### Checklists and Best Practices and Code Hygine
@@ -60,7 +60,7 @@ Experiments should be tracked with meaningful names and logging any parameters i
 ## Code style notes
 - Prefer pure functions where possible. Keep side effects at boundaries. Make sure functions or classes you write do not repeat code or logic and are highly modular with minimal code expressions for solutions. Use list/dictionary comprehension to generate cleaner code that is easily readable. Feel free to use shorter and more sucient variable names.
 - when it comes to writing comments if you have a lot to say do not split up comments on multipline by multiple consequent # or // symbols but rather write complete sentences and comment directly next to logic - do not use any emojis in comments and feel free to not use perfect grammar.
-- Keep modules <300–400 lines where possible. Extract helpers early into unified scripts and avoid generating noisy scattered solutions. File structure should extract library and reusable components into alveslib or into locally importable modules. 
+- Keep modules <300–400 lines where possible. Extract helpers early into unified scripts and avoid generating noisy scattered solutions. File structure should extract library and reusable components into shacklib or into locally importable modules. 
 - Type everything at public boundaries. mypy-friendly.
 - Return precise errors. Avoid blanket exceptions. But avoid noisy try-catch multiple nested layers.
 
