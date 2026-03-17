@@ -3,7 +3,7 @@
   "root": "apps/backend/fastapi",
   "sourceRoot": "apps/backend/fastapi",
   "projectType": "application",
-  "implicitDependencies": ["alveslib"],
+  "implicitDependencies": ["shacklib"],
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

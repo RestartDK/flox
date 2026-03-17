@@ -44,7 +44,7 @@ dev = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["alveslib*"]
+include = ["shacklib*"]
 exclude = ["apps*", "ml*", "tests*"]
 
 [tool.uv]

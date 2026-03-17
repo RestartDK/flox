@@ -1,31 +1,31 @@
 {
-  "name": "alveslib",
-  "root": "alveslib",
-  "sourceRoot": "alveslib",
+  "name": "shacklib",
+  "root": "shacklib",
+  "sourceRoot": "shacklib",
   "projectType": "library",
   "targets": {
     "build": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "python3.12 -m compileall alveslib"
+        "command": "python3.12 -m compileall shacklib"
       }
     },
     "lint": {
       "executor": "nx:run-commands",
       "options": {
-        "command": ".venv/bin/ruff check alveslib"
+        "command": ".venv/bin/ruff check shacklib"
       }
     },
     "typecheck": {
       "executor": "nx:run-commands",
       "options": {
-        "command": ".venv/bin/mypy alveslib"
+        "command": ".venv/bin/mypy shacklib"
       }
     },
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": ".venv/bin/pytest alveslib -v"
+        "command": ".venv/bin/pytest shacklib -v"
       }
     }
   }

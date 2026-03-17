@@ -3,7 +3,7 @@
   "root": "ml",
   "sourceRoot": "ml",
   "projectType": "application",
-  "implicitDependencies": ["alveslib"],
+  "implicitDependencies": ["shacklib"],
   "targets": {
     "dev": {
       "executor": "nx:run-commands",

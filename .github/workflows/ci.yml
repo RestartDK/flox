@@ -40,8 +40,8 @@ jobs:
       - name: Install deps
         run: pip install ruff python-dotenv
       - name: Lint
-        run: ruff check src/ ml/ apps/worker/ apps/backend/ alveslib/ || true
+        run: ruff check src/ ml/ apps/worker/ apps/backend/ shacklib/ || true
       - name: Import smoke test
         run: |
-          python -c "from alveslib.logger import get_logger; print('logger ok')"
-          python -c "from alveslib.scraper import ScraperCache; print('scraper ok')" || true
+          python -c "from shacklib.logger import get_logger; print('logger ok')"
+          python -c "from shacklib.scraper import ScraperCache; print('scraper ok')" || true

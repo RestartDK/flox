@@ -32,7 +32,7 @@ ml/
   data/            etl.py + processed artifacts
   inference.py     FastAPI inference server
   notebooks/       Jupyter notebooks
-alveslib/          Shared Python utilities (logger, scraper, agent)
+shacklib/          Shared Python utilities (logger, scraper, agent)
 src/               Simple scripts / CLI entry points
 ```
 
@@ -65,7 +65,7 @@ This template now ships with Nx project definitions for:
 - `backend-flask` (`apps/backend/flask`)
 - `worker` (`apps/worker`)
 - `ml` (`ml`)
-- `alveslib` (`alveslib`)
+- `shacklib` (`shacklib`)
 
 Common commands:
 
@@ -81,7 +81,7 @@ bun x nx affected -t lint,test,build
 Set `ANTHROPIC_API_KEY` in `.env`. Then use:
 
 ```python
-from alveslib import ask, stream, Agent
+from shacklib import ask, stream, Agent
 
 # One-shot
 print(ask("Summarize this data: ..."))
@@ -107,7 +107,7 @@ Claude Code slash commands (type `/` in a Claude Code session):
 ## Logging
 
 ```python
-from alveslib import get_logger
+from shacklib import get_logger
 logger = get_logger("service")
 ```
 

@@ -11,7 +11,7 @@ apps/backend/fastapi/ FastAPI server
 apps/backend/flask/   Flask server
 apps/worker/          Celery worker (Redis broker)
 ml/                   PyTorch ML pipeline (arch, train, inference, etl)
-alveslib/             Shared Python library: logger, scraper, agent
+shacklib/             Shared Python library: logger, scraper, agent
 src/                  Simple scripts / CLI
 ```
 
@@ -21,15 +21,15 @@ src/                  Simple scripts / CLI
 - Python deps: use root `pyproject.toml` + `uv.lock`; `make envlink` propagates `.env` to sub-apps.
 - JS/TS: Bun is the package manager for `apps/webapp`. Use `bun add` / `bun install` / `bun dev`.
 - Do not create rogue files or test scripts outside the established structure.
-- All shared Python utilities go in `alveslib/`. Import from there, never duplicate logic.
+- All shared Python utilities go in `shacklib/`. Import from there, never duplicate logic.
 - No emojis in code, comments, or logs.
 
 ## AI / Agent SDK
 
-`ANTHROPIC_API_KEY` is required for AI features. `alveslib.agent` provides:
+`ANTHROPIC_API_KEY` is required for AI features. `shacklib.agent` provides:
 
 ```python
-from alveslib import ask, stream, Agent
+from shacklib import ask, stream, Agent
 
 ask("prompt")            # blocking one-shot
 stream("prompt")         # iterator of text chunks
