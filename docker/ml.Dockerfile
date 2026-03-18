@@ -8,14 +8,12 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install external dependencies only - layer cached until pyproject.toml changes.
-# Stub files satisfy setuptools' package discovery without real source,
-# so external deps are downloaded once and reused across source-only rebuilds.
-COPY pyproject.toml ./
-RUN touch README.md \
-    && mkdir -p shacklib && touch shacklib/__init__.py \
-    && pip install --no-cache-dir . \
-    && rm -rf shacklib README.md
+# Install inference dependencies only.
+COPY docker/requirements.ml.txt ./docker/requirements.ml.txt
+RUN pip install --no-cache-dir -r docker/requirements.ml.txt
+
+# Install local shared library without pulling full project dependencies.
+COPY pyproject.toml ./pyproject.toml
 
 # Copy local library and reinstall it without re-downloading external deps
 COPY shacklib/ ./shacklib/

@@ -7,14 +7,13 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install external dependencies only - layer cached until pyproject.toml changes.
-# Stub files satisfy setuptools' package discovery without real source,
-# so external deps are downloaded once and reused across source-only rebuilds.
-COPY pyproject.toml ./
-RUN touch README.md \
-    && mkdir -p shacklib && touch shacklib/__init__.py \
-    && pip install --no-cache-dir . \
-    && rm -rf shacklib README.md
+# Install runtime dependencies for worker/classifier.
+# Keep this list lean to avoid downloading ML/GPU packages.
+COPY docker/requirements.worker.txt ./docker/requirements.worker.txt
+RUN pip install --no-cache-dir -r docker/requirements.worker.txt
+
+# Install local shared library without pulling full project dependencies.
+COPY pyproject.toml ./pyproject.toml
 
 # Copy local library and reinstall it without re-downloading external deps
 COPY shacklib/ ./shacklib/

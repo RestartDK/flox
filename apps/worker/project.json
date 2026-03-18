@@ -12,6 +12,13 @@
         "command": "celery -A worker:app worker --loglevel=info"
       }
     },
+    "classify": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/worker",
+        "command": "celery -A worker:app beat --loglevel=info"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "options": {

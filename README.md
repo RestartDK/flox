@@ -11,7 +11,7 @@ make dev                    # Next.js webapp at http://localhost:3000
 make nx.projects            # list Nx projects in the monorepo
 ```
 
-For Docker services (redis, fastapi backend, ml inference, worker):
+For Docker services (postgres, redis, fastapi backend, classifier worker, ml inference, worker):
 ```bash
 make up
 ```
@@ -143,7 +143,7 @@ bun x nx run ml:train
 
 | Profile | Services | Command |
 |---------|----------|---------|
-| _(default)_ | redis, backend-fastapi, ml-inference, worker | `make up` |
+| _(default)_ | postgres, redis, backend-fastapi, backend-classifier, ml-inference, worker | `make up` |
 | `minio` | + MinIO object storage | `make lift.minio` |
 | `tensorboard` | + TensorBoard | `make lift.tensorboard` |
 | `mlflow` | + MLflow tracking server (optional) | `make lift.mlflow` |
