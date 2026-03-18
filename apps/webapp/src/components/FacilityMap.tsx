@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
-import { ahuUnits, type Device } from '@/data/mockDevices';
+import { ahuUnits, type Device, type AirflowDirection } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FacilityMapProps {
@@ -44,6 +44,7 @@ const DeviceNode = ({ device, selected, onClick }: { device: Device; selected: b
           {selected && (
             <circle cx={device.x} cy={device.y} r={16} fill="none" stroke="hsl(var(--foreground))" strokeWidth={1.5} />
           )}
+          <circle cx={device.x} cy={device.y} r={12} fill="hsl(var(--card))" stroke="none" />
           <circle cx={device.x} cy={device.y} r={12} fill={`hsl(${statusColor[device.status]} / 0.15)`} stroke={color} strokeWidth={1.5} />
           <text x={device.x} y={device.y + 1} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize={9} fontWeight={600} fontFamily="var(--font-display)">
             {deviceIcon[device.type]}
@@ -244,7 +245,47 @@ const FloorPlanBase = () => (
   </g>
 );
 
-// AHU boxes rendered on the map
+const RING_COUNT = 3;
+const airflowColor: Record<NonNullable<AirflowDirection>, string> = {
+  supply: 'var(--brand)',
+  return: '210 80% 55%',
+};
+
+const AirflowRing = ({ cx, cy, direction, delay, duration, color }: {
+  cx: number; cy: number; direction: NonNullable<AirflowDirection>; delay: number; duration: number; color: string;
+}) => (
+  <circle
+    cx={cx} cy={cy} r={6}
+    fill="none"
+    stroke={`hsl(${color})`}
+    strokeWidth={1}
+    className={direction === 'supply' ? 'airflow-expand' : 'airflow-contract'}
+    style={{ animationDuration: `${duration}s`, animationDelay: `${delay}s` }}
+  />
+);
+
+const AirflowOverlay = ({ devices, nodePositions }: { devices: Device[]; nodePositions: Record<string, number> }) => (
+  <g>
+    {devices
+      .filter(d => d.airflowDirection && (nodePositions[d.id] ?? 0) > 0)
+      .map(d => {
+        const flow = nodePositions[d.id] ?? 0;
+        const dur = Math.max(1.5, 4 - flow * 2.5);
+        const color = airflowColor[d.airflowDirection!];
+        return Array.from({ length: RING_COUNT }, (_, i) => (
+          <AirflowRing
+            key={`${d.id}-${i}`}
+            cx={d.x} cy={d.y}
+            direction={d.airflowDirection!}
+            delay={(dur / RING_COUNT) * i}
+            duration={dur}
+            color={color}
+          />
+        ));
+      })}
+  </g>
+);
+
 const AHUNodes = () => (
   <g>
     {ahuUnits.map(ahu => (
@@ -360,6 +401,16 @@ export default function FacilityMap({ devices, nodePositions, onDeviceSelect, se
             <span className="font-display ml-1">D</span>Dmp
             <span className="font-display ml-1">V</span>Vlv
           </span>
+          <span className="border-l border-border pl-3 flex items-center gap-2">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border" style={{ borderColor: `hsl(${airflowColor.supply})`, opacity: 0.6 }} />
+              <span>Supply</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border" style={{ borderColor: `hsl(${airflowColor.return})`, opacity: 0.6 }} />
+              <span>Return</span>
+            </span>
+          </span>
         </div>
 
         <svg
@@ -384,6 +435,9 @@ export default function FacilityMap({ devices, nodePositions, onDeviceSelect, se
 
           {/* Ductwork connections */}
           <Ductwork nodePositions={nodePositions} />
+
+          {/* Airflow visualization */}
+          <AirflowOverlay devices={devices} nodePositions={nodePositions} />
 
           {/* AHU units */}
           <AHUNodes />

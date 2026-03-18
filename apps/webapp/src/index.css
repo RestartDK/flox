@@ -161,4 +161,23 @@
   @keyframes ductFlow {
     to { stroke-dashoffset: -20; }
   }
+
+  .airflow-expand {
+    animation: airflowExpand ease-out infinite;
+  }
+
+  .airflow-contract {
+    animation: airflowContract ease-in infinite;
+  }
+
+  @keyframes airflowExpand {
+    0% { r: 6; opacity: 0.4; }
+    100% { r: 55; opacity: 0; }
+  }
+
+  @keyframes airflowContract {
+    0% { r: 55; opacity: 0; }
+    70% { opacity: 0.3; }
+    100% { r: 6; opacity: 0; }
+  }
 }
