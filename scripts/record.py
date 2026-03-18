@@ -23,9 +23,9 @@ def main():
     safe_event_name = "".join([c if c.isalnum() else "_" for c in args.event_name])
     filename = f"{safe_event_name}.csv"
 
-    print(f"🚀 Starting continuous recording for event: '{args.event_name}'")
-    print(f"📁 Streaming data directly to {filename}...")
-    print("⏳ Press CTRL-C to stop recording...\n")
+    print(f"Starting continuous recording for event: '{args.event_name}'")
+    print(f"Streaming data directly to {filename}...")
+    print("Press CTRL-C to stop recording...\n")
 
     # Connect to InfluxDB
     client = InfluxDBClient(url=URL, token=TOKEN, org=ORG, verify_ssl=False)
@@ -87,16 +87,16 @@ def main():
                         print(f"[{current_clock}] Appended {new_rows} new rows... (Total: {total_rows})")
 
             except Exception as e:
-                print(f"⚠️ Error fetching chunk: {e}")
+                print(f"Error fetching chunk: {e}")
 
             # Sleep briefly. 1 second is safe because we are querying a 5-second rolling window.
             time.sleep(1.0)
 
     except KeyboardInterrupt:
-        print("\n🛑 CTRL-C detected. Stopping stream...")
+        print("\nCTRL-C detected. Stopping stream...")
     finally:
         client.close()
-        print(f"✅ Finished. A total of {total_rows} rows were saved to {filename}.")
+        print(f"Finished. A total of {total_rows} rows were saved to {filename}.")
 
 if __name__ == "__main__":
     main()
