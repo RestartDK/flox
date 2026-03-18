@@ -6,6 +6,64 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+
+    --background: 210 29% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 30% 93%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 25% 91%;
+    --muted-foreground: 215 16% 38%;
+
+    --accent: 150 100% 36%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 38 92% 10%;
+
+    --border: 214 25% 85%;
+    --input: 214 25% 85%;
+    --ring: 150 100% 36%;
+
+    --radius: 2px;
+
+    --sidebar-background: 210 28% 94%;
+    --sidebar-foreground: 222 20% 28%;
+    --sidebar-primary: 222 47% 11%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 24% 88%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 25% 82%;
+    --sidebar-ring: 150 100% 36%;
+
+    --status-healthy: 150 100% 36%;
+    --status-warning: 38 92% 50%;
+    --status-fault: 0 72% 51%;
+    --status-offline: 215 12% 58%;
+
+    --font-display: 'Geist Mono', ui-monospace, monospace;
+    --font-body: 'Inter', system-ui, sans-serif;
+
+    --ease-swift: cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  .dark {
+    color-scheme: dark;
+
     --background: 220 15% 3%;
     --foreground: 220 10% 98%;
 
@@ -85,7 +143,8 @@
   .data-row {
     @apply h-10 flex items-center px-4 border-b border-border transition-colors;
   }
+
   .data-row:hover {
-    background: hsl(220 15% 8%);
+    background: hsl(var(--muted));
   }
 }

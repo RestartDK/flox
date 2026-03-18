@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { devices, type Device, type Fault } from '@/data/mockDevices';
-import { AlertTriangle, Zap, MapPin, Clock, Filter, ChevronRight, Wrench } from 'lucide-react';
+import { type Device, type Fault } from '@/data/mockDevices';
+import { ChevronRight, Zap } from 'lucide-react';
 
 interface AlertDashboardProps {
+  devices: Device[];
   onNavigateToDevice: (device: Device) => void;
 }
 
@@ -14,6 +15,11 @@ interface AlertItem {
 
 const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
+const parseEnergyWaste = (value: string) => {
+  const match = value.match(/([\d,.]+)/);
+  return match ? Number(match[1].replace(/,/g, '')) : 0;
+};
+
 const severityBadge: Record<string, string> = {
   critical: 'bg-status-fault/15 text-status-fault border-status-fault/30',
   high: 'bg-status-warning/15 text-status-warning border-status-warning/30',
@@ -21,7 +27,7 @@ const severityBadge: Record<string, string> = {
   low: 'bg-muted text-muted-foreground border-border',
 };
 
-export default function AlertDashboard({ onNavigateToDevice }: AlertDashboardProps) {
+export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDashboardProps) {
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
 
   const alerts: AlertItem[] = devices
@@ -29,6 +35,7 @@ export default function AlertDashboard({ onNavigateToDevice }: AlertDashboardPro
     .sort((a, b) => severityOrder[a.fault.severity] - severityOrder[b.fault.severity]);
 
   const filtered = severityFilter ? alerts.filter(a => a.fault.severity === severityFilter) : alerts;
+  const totalEnergyWaste = `${alerts.reduce((sum, alert) => sum + parseEnergyWaste(alert.fault.energyWaste), 0).toLocaleString()} kWh/day`;
 
   return (
     <div className="flex-1 p-6 overflow-y-auto">
@@ -39,12 +46,12 @@ export default function AlertDashboard({ onNavigateToDevice }: AlertDashboardPro
 
       {/* Summary bar */}
       <div className="grid grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'Critical', count: alerts.filter(a => a.fault.severity === 'critical').length, color: 'border-status-fault/30', text: 'text-status-fault' },
-          { label: 'High', count: alerts.filter(a => a.fault.severity === 'high').length, color: 'border-status-warning/30', text: 'text-status-warning' },
-          { label: 'Medium', count: alerts.filter(a => a.fault.severity === 'medium').length, color: 'border-border', text: 'text-muted-foreground' },
-          { label: 'Total Energy Waste', count: '540 kWh/day', color: 'border-border', text: 'text-foreground', wide: true },
-        ].map((s, i) => (
+          {[
+            { label: 'Critical', count: alerts.filter(a => a.fault.severity === 'critical').length, color: 'border-status-fault/30', text: 'text-status-fault' },
+            { label: 'High', count: alerts.filter(a => a.fault.severity === 'high').length, color: 'border-status-warning/30', text: 'text-status-warning' },
+            { label: 'Medium', count: alerts.filter(a => a.fault.severity === 'medium').length, color: 'border-border', text: 'text-muted-foreground' },
+            { label: 'Total Energy Waste', count: totalEnergyWaste, color: 'border-border', text: 'text-foreground', wide: true },
+          ].map((s, i) => (
           <motion.div
             key={s.label}
             initial={{ opacity: 0, y: 4 }}

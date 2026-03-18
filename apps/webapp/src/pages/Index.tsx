@@ -1,34 +1,37 @@
 import { useState } from 'react';
-import { type Device } from '@/data/mockDevices';
 import AppSidebar from '@/components/AppSidebar';
 import FacilityMap from '@/components/FacilityMap';
 import DeviceDetailPanel from '@/components/DeviceDetailPanel';
 import AlertDashboard from '@/components/AlertDashboard';
+import { useFacilityData } from '@/hooks/useFacilityData';
 
 export default function Index() {
   const [activeView, setActiveView] = useState<'map' | 'alerts'>('map');
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const { buildingStats, devices } = useFacilityData();
+  const selectedDevice = devices.find(device => device.id === selectedDeviceId) ?? null;
 
-  const handleDeviceSelect = (device: Device) => {
-    setSelectedDevice(device);
+  const handleDeviceSelect = (deviceId: string) => {
+    setSelectedDeviceId(deviceId);
     setActiveView('map');
   };
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar activeView={activeView} onViewChange={setActiveView} />
+      <AppSidebar activeView={activeView} onViewChange={setActiveView} buildingStats={buildingStats} />
       
       <div className="flex flex-1 overflow-hidden">
         {activeView === 'map' ? (
           <FacilityMap
-            onDeviceSelect={setSelectedDevice}
-            selectedDeviceId={selectedDevice?.id ?? null}
+            devices={devices}
+            onDeviceSelect={(device) => setSelectedDeviceId(device.id)}
+            selectedDeviceId={selectedDeviceId}
           />
         ) : (
-          <AlertDashboard onNavigateToDevice={handleDeviceSelect} />
+          <AlertDashboard devices={devices} onNavigateToDevice={(device) => handleDeviceSelect(device.id)} />
         )}
 
-        <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDevice(null)} />
+        <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDeviceId(null)} />
       </div>
 
       {/* Top loading bar placeholder */}

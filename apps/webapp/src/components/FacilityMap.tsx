@@ -2,10 +2,11 @@ import { useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { devices, ahuUnits, type Device } from '@/data/mockDevices';
+import { ahuUnits, type Device } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FacilityMapProps {
+  devices: Device[];
   onDeviceSelect: (device: Device) => void;
   selectedDeviceId: string | null;
 }
@@ -244,7 +245,7 @@ const AHUNodes = () => (
   </g>
 );
 
-export default function FacilityMap({ onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
+export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
 
@@ -293,7 +294,7 @@ export default function FacilityMap({ onDeviceSelect, selectedDeviceId }: Facili
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div>
           <h1 className="font-display text-lg tracking-tight">Facility Overview</h1>
-          <p className="text-[13px] text-muted-foreground mt-0.5">2-Bedroom Apartment · 78 m² · 8 devices connected</p>
+          <p className="text-[13px] text-muted-foreground mt-0.5">2-Bedroom Apartment · 78 m² · {devices.length} devices connected</p>
         </div>
         <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
           {['healthy', 'warning', 'fault'].map(s => (

@@ -1,9 +1,11 @@
-import { buildingStats } from '@/data/mockDevices';
+import { type BuildingStats } from '@/data/mockDevices';
+import { ModeToggle } from '@/components/mode-toggle';
 import { Activity, AlertTriangle, Map, type LucideIcon } from 'lucide-react';
 
 interface AppSidebarProps {
   activeView: 'map' | 'alerts';
   onViewChange: (view: 'map' | 'alerts') => void;
+  buildingStats: BuildingStats;
 }
 
 const StatBlock = ({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) => (
@@ -27,16 +29,21 @@ const NavItem = ({ icon: Icon, label, active, onClick }: { icon: LucideIcon; lab
   </button>
 );
 
-export default function AppSidebar({ activeView, onViewChange }: AppSidebarProps) {
+export default function AppSidebar({ activeView, onViewChange, buildingStats }: AppSidebarProps) {
   return (
     <aside className="w-[260px] h-screen bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
       {/* Header */}
       <div className="px-4 py-5 border-b border-sidebar-border">
-        <div className="font-display text-sm tracking-tight text-foreground flex items-center gap-2">
-          <Activity size={16} className="text-accent" />
-          VAULT / HVAC
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-display text-sm tracking-tight text-foreground flex items-center gap-2">
+              <Activity size={16} className="text-accent" />
+              VAULT / HVAC
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">Belimo Observability Platform</div>
+          </div>
+          <ModeToggle />
         </div>
-        <div className="text-[11px] text-muted-foreground mt-1">Belimo Observability Platform</div>
       </div>
 
       {/* Navigation */}
