@@ -1,7 +1,7 @@
 # Makefile - Ultiplate Template
 .PHONY: help init bootstrap venv deps lock envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
-.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml
+.PHONY: dev run.webapp run.webapp.simple run.backend run.classifier run.worker run.ml
 .PHONY: lift lift.minio lift.tensorboard lift.mlflow lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: nx.graph nx.projects nx.affected
@@ -74,8 +74,8 @@ test: venv ## Run pytest
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 
-up: ## Start core services (redis, backend-fastapi, ml-inference, worker)
-	@docker compose up -d redis backend-fastapi ml-inference worker
+up: ## Start core services (postgres, redis, backend, classifier, ml, worker)
+	@docker compose up -d postgres redis backend-fastapi backend-classifier ml-inference worker
 
 down: ## Stop all services
 	@docker compose down
@@ -133,6 +133,9 @@ run.backend: ## Start API backend (BACKEND_MODE=fastapi|flask, default: fastapi)
 	else \
 		echo "Unknown BACKEND_MODE=$$MODE (fastapi|flask)"; exit 1; \
 	fi
+
+run.classifier: ## Start classifier loop worker
+	@$(NX) run worker:classify
 
 run.worker: ## Start Celery worker (requires redis)
 	@$(NX) run worker:dev
