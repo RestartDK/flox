@@ -45,6 +45,7 @@ services:
 
   ml-inference:
     container_name: "${NAME}-mlinfer"
+    profiles: ["ml"]
     build:
       context: ./
       dockerfile: ./docker/ml.Dockerfile

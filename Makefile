@@ -2,7 +2,7 @@
 .PHONY: help init bootstrap venv deps lock envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
 .PHONY: dev run.webapp run.webapp.simple run.backend run.classifier run.worker run.ml
-.PHONY: lift lift.minio lift.tensorboard lift.mlflow lift.logging lift.database
+.PHONY: lift lift.ml lift.minio lift.tensorboard lift.mlflow lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: nx.graph nx.projects nx.affected
 .DEFAULT_GOAL := help
@@ -74,8 +74,8 @@ test: venv ## Run pytest
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 
-up: ## Start core services (postgres, redis, backend, classifier, ml, worker)
-	@docker compose up -d postgres redis backend-fastapi backend-classifier ml-inference worker
+up: ## Start core services (postgres, redis, backend, classifier, worker)
+	@docker compose up -d postgres redis backend-fastapi backend-classifier worker
 
 down: ## Stop all services
 	@docker compose down
@@ -92,6 +92,9 @@ rebuild: ## Rebuild + restart all services (no cache)
 ## ── Service Profiles ─────────────────────────────────────────────────────────
 
 lift: up ## Alias for 'up'
+
+lift.ml: ## Start core services + ML inference
+	@docker compose --profile ml up -d postgres redis backend-fastapi backend-classifier ml-inference worker
 
 lift.minio: ## Start core services + MinIO object storage
 	@docker compose --profile minio up -d
