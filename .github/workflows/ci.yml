@@ -8,7 +8,7 @@ on:
 
 jobs:
   webapp:
-    name: Next.js build
+    name: Vite webapp checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,13 +21,15 @@ jobs:
       - name: Type check
         working-directory: apps/webapp
         run: bun run typecheck
+      - name: Lint
+        working-directory: apps/webapp
+        run: bun run lint
+      - name: Test
+        working-directory: apps/webapp
+        run: bun run test
       - name: Build
         working-directory: apps/webapp
         run: bun run build
-        env:
-          NEXT_PUBLIC_REQUIRE_AUTH: "false"
-          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
 
   python:
     name: Python lint + import check
