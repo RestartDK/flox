@@ -9,7 +9,7 @@ Implement the feature or task described in the arguments end-to-end across the f
 
 After implementing, run a quick sanity check:
 - If Python changed: check imports resolve correctly
-- If Next.js changed: check TypeScript compiles (bun run typecheck)
+- If frontend code changed: check TypeScript compiles (bun run typecheck)
 - If docker-compose changed: verify YAML is valid
 
 Do not create documentation files. Do not add emojis. Summarize what was done in one paragraph.

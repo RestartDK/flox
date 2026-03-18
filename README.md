@@ -7,7 +7,7 @@ Template for any project: SaaS webapp, API server, ML pipeline, scraper, CLI, or
 ```bash
 cp .env.example .env        # fill in NAME and any keys you need
 make init                   # uv venv + sync + env linking
-make dev                    # Next.js webapp at http://localhost:3000
+make dev                    # Vite webapp at http://localhost:3000
 make nx.projects            # list Nx projects in the monorepo
 ```
 
@@ -20,7 +20,7 @@ make up
 
 ```
 apps/
-  webapp/          Next.js 15 + React 19 + Tailwind 4 + Supabase auth (Bun, Turbopack)
+  webapp/          Vite + React 18 + Tailwind + Supabase auth (Bun)
   webapp-minimal/  Streamlit quick prototype
   backend/
     fastapi/       FastAPI server (set BACKEND_MODE=fastapi)
@@ -41,7 +41,7 @@ src/               Simple scripts / CLI entry points
 | Target | Description |
 |--------|-------------|
 | `make init` | First-time setup |
-| `make dev` | Start Next.js webapp |
+| `make dev` | Start Vite webapp |
 | `make up` | Start Docker core services |
 | `make run.backend` | Start API backend |
 | `make run.worker` | Start Celery worker |
@@ -76,6 +76,23 @@ bun x nx run webapp:dev
 bun x nx affected -t lint,test,build
 ```
 
+## Railway Deploy
+
+The frontend in `apps/webapp` is a Vite React app. If you deploy from the repo root on Railway, use `railway.json` so Railpack builds and starts the correct app:
+
+- build: `bun install --cwd apps/webapp && bun run --cwd apps/webapp build`
+- start: `bun run --cwd apps/webapp start`
+
+If you instead set the Railway service Root Directory to `apps/webapp`, the equivalent commands are:
+
+```bash
+bun install
+bun run build
+bun run start
+```
+
+Frontend environment variables must use the `VITE_` prefix.
+
 ## AI Agent Capacity
 
 Set `ANTHROPIC_API_KEY` in `.env`. Then use:
@@ -100,7 +117,7 @@ Claude Code slash commands (type `/` in a Claude Code session):
 - `/plan` - implementation plan for an idea within this boilerplate
 - `/build` - implement a feature end-to-end
 - `/api` - scaffold a new backend endpoint
-- `/page` - scaffold a new Next.js page
+- `/page` - scaffold a new webapp page
 - `/review` - code review of recent changes
 - `/ship` - stage and commit changes
 
@@ -152,4 +169,4 @@ bun x nx run ml:train
 
 ## Webapp Auth
 
-Auth is off by default (`NEXT_PUBLIC_REQUIRE_AUTH=false`). Set it to `true` and configure Supabase keys to enable session-based auth gating across all routes.
+Auth is off by default (`VITE_REQUIRE_AUTH=false`). Set it to `true` and configure the Vite-prefixed Supabase env vars to enable session-based auth gating across all routes.
