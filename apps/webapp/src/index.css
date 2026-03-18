@@ -26,8 +26,11 @@
     --muted: 210 25% 91%;
     --muted-foreground: 215 16% 38%;
 
-    --accent: 150 100% 36%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 210 25% 91%;
+    --accent-foreground: 222 47% 11%;
+
+    --brand: 150 100% 36%;
+    --brand-foreground: 210 40% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -82,8 +85,11 @@
     --muted: 220 15% 12%;
     --muted-foreground: 220 10% 60%;
 
-    --accent: 150 100% 50%;
-    --accent-foreground: 220 15% 3%;
+    --accent: 220 15% 14%;
+    --accent-foreground: 220 10% 85%;
+
+    --brand: 150 100% 50%;
+    --brand-foreground: 220 15% 3%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -146,5 +152,13 @@
 
   .data-row:hover {
     background: hsl(var(--muted));
+  }
+
+  .duct-flow {
+    animation: ductFlow linear infinite;
+  }
+
+  @keyframes ductFlow {
+    to { stroke-dashoffset: -20; }
   }
 }

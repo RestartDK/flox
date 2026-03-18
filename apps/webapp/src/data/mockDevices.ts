@@ -71,6 +71,7 @@ export interface LiveNode {
   label: string;
   type: FacilityNodeType;
   status: LiveNodeStatus;
+  position: number; // 0-1 decimal, valve/damper open percentage driving airflow speed
   parentIds: string[];
   fault: LiveFault | null;
 }
@@ -229,6 +230,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'AHU 01',
       type: 'ahu',
       status: 'warning',
+      position: 0.92,
       parentIds: [],
       fault: null,
     },
@@ -237,6 +239,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'AHU 02',
       type: 'ahu',
       status: 'warning',
+      position: 0.55,
       parentIds: [],
       fault: null,
     },
@@ -245,6 +248,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Kitchen Supply Actuator',
       type: 'actuator',
       status: 'healthy',
+      position: 0.95,
       parentIds: ['ahu-01'],
       fault: null,
     },
@@ -253,6 +257,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Kitchen Exhaust Damper',
       type: 'damper',
       status: 'healthy',
+      position: 0,
       parentIds: ['ahu-01'],
       fault: null,
     },
@@ -261,6 +266,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Living Room Chiller Valve',
       type: 'valve',
       status: 'critical',
+      position: 0.12,
       parentIds: ['ahu-01'],
       fault: {
         id: 'fault-003',
@@ -276,6 +282,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Living Room Damper Actuator',
       type: 'actuator',
       status: 'warning',
+      position: 0.88,
       parentIds: ['ahu-01'],
       fault: {
         id: 'fault-004',
@@ -291,6 +298,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bathroom Water Valve',
       type: 'valve',
       status: 'warning',
+      position: 0,
       parentIds: ['ahu-02'],
       fault: {
         id: 'fault-005',
@@ -306,6 +314,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 1 Supply Damper',
       type: 'damper',
       status: 'healthy',
+      position: 1.0,
       parentIds: ['ahu-02'],
       fault: null,
     },
@@ -314,6 +323,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 1 Return Actuator',
       type: 'actuator',
       status: 'healthy',
+      position: 0.08,
       parentIds: ['ahu-02'],
       fault: null,
     },
@@ -322,6 +332,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 2 Fresh Air Damper',
       type: 'damper',
       status: 'healthy',
+      position: 0.42,
       parentIds: ['ahu-02'],
       fault: null,
     },

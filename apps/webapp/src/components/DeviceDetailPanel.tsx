@@ -78,7 +78,7 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
             <div className="label-caps mb-3">Live Telemetry (24h)</div>
             <div className="space-y-4">
               {[
-                { label: 'Torque (Nm)', data: device.torque, color: 'hsl(var(--accent))' },
+                { label: 'Torque (Nm)', data: device.torque, color: 'hsl(var(--brand))' },
                 { label: 'Position (%)', data: device.position, color: 'hsl(var(--foreground))' },
                 { label: 'Temperature (°C)', data: device.temperature, color: 'hsl(var(--status-warning))' },
               ].map(t => (

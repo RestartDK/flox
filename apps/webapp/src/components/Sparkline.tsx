@@ -7,7 +7,7 @@ interface SparklineProps {
   height?: number;
 }
 
-export default function Sparkline({ data, color = 'hsl(var(--accent))', width = 120, height = 32 }: SparklineProps) {
+export default function Sparkline({ data, color = 'hsl(var(--brand))', width = 120, height = 32 }: SparklineProps) {
   if (!data.length) return null;
 
   const values = data.map(d => d.value);
