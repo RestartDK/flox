@@ -74,8 +74,8 @@ test: venv ## Run pytest
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 
-up: ## Start core services (redis, ml-inference, worker)
-	@docker compose up -d redis ml-inference worker
+up: ## Start core services (redis, backend-fastapi, ml-inference, worker)
+	@docker compose up -d redis backend-fastapi ml-inference worker
 
 down: ## Stop all services
 	@docker compose down
