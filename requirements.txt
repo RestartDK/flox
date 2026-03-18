@@ -29,5 +29,5 @@ streamlit
 anthropic
 
 # ML (heavy - comment out if not needed)
-torch
-tensorboard
+# torch
+# tensorboard
