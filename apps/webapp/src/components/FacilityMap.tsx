@@ -3,11 +3,12 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
-import { ahuUnits, type Device } from '@/data/mockDevices';
+import { ahuUnits, type Device, type AirflowDirection } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FacilityMapProps {
   devices: Device[];
+  nodePositions: Record<string, number>;
   onDeviceSelect: (device: Device) => void;
   selectedDeviceId: string | null;
 }
@@ -43,6 +44,7 @@ const DeviceNode = ({ device, selected, onClick }: { device: Device; selected: b
           {selected && (
             <circle cx={device.x} cy={device.y} r={16} fill="none" stroke="hsl(var(--foreground))" strokeWidth={1.5} />
           )}
+          <circle cx={device.x} cy={device.y} r={12} fill="hsl(var(--card))" stroke="none" />
           <circle cx={device.x} cy={device.y} r={12} fill={`hsl(${statusColor[device.status]} / 0.15)`} stroke={color} strokeWidth={1.5} />
           <text x={device.x} y={device.y + 1} textAnchor="middle" dominantBaseline="middle" fill={color} fontSize={9} fontWeight={600} fontFamily="var(--font-display)">
             {deviceIcon[device.type]}
@@ -64,24 +66,41 @@ const DeviceNode = ({ device, selected, onClick }: { device: Device; selected: b
   );
 };
 
-// Ductwork connections from AHUs to devices
-const Ductwork = () => (
-  <g stroke="hsl(var(--accent) / 0.4)" strokeWidth={1.5} fill="none" strokeDasharray="6 3">
-    {/* AHU-01 (310,240) → Kitchen devices */}
-    <path d="M 310 240 L 240 240 L 240 210 L 160 210" />
-    <path d="M 310 240 L 200 240 L 200 100 L 80 100" />
-    {/* AHU-01 → Living Room devices */}
-    <path d="M 310 240 L 420 240 L 420 100 L 550 100" />
-    <path d="M 310 240 L 500 240 L 500 200 L 700 200" />
-    {/* AHU-01 → AHU-02 trunk */}
-    <path d="M 310 260 L 310 370 L 460 370" />
-    {/* AHU-02 (460,370) → Bathroom */}
-    <path d="M 460 370 L 200 370 L 200 380 L 100 380" />
-    {/* AHU-02 → Bedroom 1 */}
-    <path d="M 460 370 L 580 370 L 580 450 L 700 450" />
-    <path d="M 460 370 L 580 370 L 580 550 L 750 550" />
-    {/* AHU-02 → Bedroom 2 */}
-    <path d="M 460 390 L 460 520 L 350 520" />
+const ductConnections = [
+  { targetId: 'BEL-ACT-001', d: 'M 310 240 L 240 240 L 240 210 L 160 210' },
+  { targetId: 'BEL-DMP-002', d: 'M 310 240 L 200 240 L 200 100 L 80 100' },
+  { targetId: 'BEL-VLV-003', d: 'M 310 240 L 420 240 L 420 100 L 550 100' },
+  { targetId: 'BEL-ACT-004', d: 'M 310 240 L 500 240 L 500 200 L 700 200' },
+  { targetId: 'ahu-02', d: 'M 310 260 L 310 370 L 460 370' },
+  { targetId: 'BEL-VLV-005', d: 'M 460 370 L 200 370 L 200 380 L 100 380' },
+  { targetId: 'BEL-DMP-006', d: 'M 460 370 L 580 370 L 580 450 L 700 450' },
+  { targetId: 'BEL-ACT-007', d: 'M 460 370 L 580 370 L 580 550 L 750 550' },
+  { targetId: 'BEL-DMP-008', d: 'M 460 390 L 460 520 L 350 520' },
+];
+
+const AnimatedDuct = ({ d, flow }: { d: string; flow: number }) => (
+  <g>
+    <path d={d} stroke="hsl(var(--brand) / 0.12)" strokeWidth={3} fill="none" strokeLinecap="round" />
+    {flow > 0 && (
+      <path
+        d={d}
+        stroke="hsl(var(--brand) / 0.55)"
+        strokeWidth={1.5}
+        fill="none"
+        strokeLinecap="round"
+        strokeDasharray="6 14"
+        className="duct-flow"
+        style={{ animationDuration: `${Math.min(8, 2 / flow)}s` }}
+      />
+    )}
+  </g>
+);
+
+const Ductwork = ({ nodePositions }: { nodePositions: Record<string, number> }) => (
+  <g>
+    {ductConnections.map(({ targetId, d }) => (
+      <AnimatedDuct key={targetId} d={d} flow={nodePositions[targetId] ?? 0} />
+    ))}
   </g>
 );
 
@@ -109,8 +128,8 @@ const FloorPlanBase = () => (
 
     {/* Doors */}
     <g>
-      <line x1="20" y1="500" x2="20" y2="560" stroke="hsl(var(--accent))" strokeWidth="3" />
-      <path d="M 20 500 Q 55 500, 55 530" fill="none" stroke="hsl(var(--accent))" strokeWidth="1.5" strokeDasharray="3,2" />
+      <line x1="20" y1="500" x2="20" y2="560" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="3" />
+      <path d="M 20 500 Q 55 500, 55 530" fill="none" stroke="hsl(var(--muted-foreground) / 0.5)" strokeWidth="1.5" strokeDasharray="3,2" />
     </g>
     <g>
       <line x1="100" y1="280" x2="150" y2="280" stroke="hsl(var(--card))" strokeWidth="10" />
@@ -134,26 +153,26 @@ const FloorPlanBase = () => (
 
     {/* Windows */}
     <g>
-      <line x1="420" y1="20" x2="560" y2="20" stroke="hsl(var(--accent) / 0.6)" strokeWidth="5" />
-      <line x1="420" y1="17" x2="560" y2="17" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
-      <line x1="420" y1="23" x2="560" y2="23" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
+      <line x1="420" y1="20" x2="560" y2="20" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="5" />
+      <line x1="420" y1="17" x2="560" y2="17" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
+      <line x1="420" y1="23" x2="560" y2="23" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
     </g>
     <g>
-      <line x1="640" y1="20" x2="760" y2="20" stroke="hsl(var(--accent) / 0.6)" strokeWidth="5" />
-      <line x1="640" y1="17" x2="760" y2="17" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
-      <line x1="640" y1="23" x2="760" y2="23" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
+      <line x1="640" y1="20" x2="760" y2="20" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="5" />
+      <line x1="640" y1="17" x2="760" y2="17" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
+      <line x1="640" y1="23" x2="760" y2="23" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
     </g>
     <g>
-      <line x1="800" y1="400" x2="800" y2="520" stroke="hsl(var(--accent) / 0.6)" strokeWidth="5" />
-      <line x1="797" y1="400" x2="797" y2="520" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
+      <line x1="800" y1="400" x2="800" y2="520" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="5" />
+      <line x1="797" y1="400" x2="797" y2="520" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
     </g>
     <g>
-      <line x1="620" y1="600" x2="760" y2="600" stroke="hsl(var(--accent) / 0.6)" strokeWidth="5" />
-      <line x1="620" y1="597" x2="760" y2="597" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
+      <line x1="620" y1="600" x2="760" y2="600" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="5" />
+      <line x1="620" y1="597" x2="760" y2="597" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
     </g>
     <g>
-      <line x1="20" y1="320" x2="20" y2="390" stroke="hsl(var(--accent) / 0.6)" strokeWidth="5" />
-      <line x1="17" y1="320" x2="17" y2="390" stroke="hsl(var(--accent) / 0.3)" strokeWidth="1" />
+      <line x1="20" y1="320" x2="20" y2="390" stroke="hsl(var(--muted-foreground) / 0.4)" strokeWidth="5" />
+      <line x1="17" y1="320" x2="17" y2="390" stroke="hsl(var(--muted-foreground) / 0.2)" strokeWidth="1" />
     </g>
 
     {/* Kitchen furniture */}
@@ -226,7 +245,47 @@ const FloorPlanBase = () => (
   </g>
 );
 
-// AHU boxes rendered on the map
+const RING_COUNT = 3;
+const airflowColor: Record<NonNullable<AirflowDirection>, string> = {
+  supply: '175 65% 48%',
+  return: '270 50% 62%',
+};
+
+const AirflowRing = ({ cx, cy, direction, delay, duration, color }: {
+  cx: number; cy: number; direction: NonNullable<AirflowDirection>; delay: number; duration: number; color: string;
+}) => (
+  <circle
+    cx={cx} cy={cy} r={6}
+    fill="none"
+    stroke={`hsl(${color})`}
+    strokeWidth={1}
+    className={direction === 'supply' ? 'airflow-expand' : 'airflow-contract'}
+    style={{ animationDuration: `${duration}s`, animationDelay: `${delay}s` }}
+  />
+);
+
+const AirflowOverlay = ({ devices, nodePositions }: { devices: Device[]; nodePositions: Record<string, number> }) => (
+  <g>
+    {devices
+      .filter(d => d.airflowDirection && (nodePositions[d.id] ?? 0) > 0)
+      .map(d => {
+        const flow = nodePositions[d.id] ?? 0;
+        const dur = Math.max(1.5, 4 - flow * 2.5);
+        const color = airflowColor[d.airflowDirection!];
+        return Array.from({ length: RING_COUNT }, (_, i) => (
+          <AirflowRing
+            key={`${d.id}-${i}`}
+            cx={d.x} cy={d.y}
+            direction={d.airflowDirection!}
+            delay={(dur / RING_COUNT) * i}
+            duration={dur}
+            color={color}
+          />
+        ));
+      })}
+  </g>
+);
+
 const AHUNodes = () => (
   <g>
     {ahuUnits.map(ahu => (
@@ -246,7 +305,7 @@ const AHUNodes = () => (
   </g>
 );
 
-export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
+export default function FacilityMap({ devices, nodePositions, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
@@ -330,7 +389,7 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
         </div>
 
         {/* Legend */}
-        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-secondary/80 px-3 py-1.5 border border-border">
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-secondary px-3 py-1.5 border border-border">
           {['healthy', 'warning', 'fault'].map(s => (
             <span key={s} className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `hsl(${statusColor[s]})` }} />
@@ -341,6 +400,16 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
             <span className="font-display">A</span>Act
             <span className="font-display ml-1">D</span>Dmp
             <span className="font-display ml-1">V</span>Vlv
+          </span>
+          <span className="border-l border-border pl-3 flex items-center gap-2">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border" style={{ borderColor: `hsl(${airflowColor.supply})`, opacity: 0.6 }} />
+              <span>Supply</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full border" style={{ borderColor: `hsl(${airflowColor.return})`, opacity: 0.6 }} />
+              <span>Return</span>
+            </span>
           </span>
         </div>
 
@@ -365,7 +434,10 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
           <FloorPlanBase />
 
           {/* Ductwork connections */}
-          <Ductwork />
+          <Ductwork nodePositions={nodePositions} />
+
+          {/* Airflow visualization */}
+          <AirflowOverlay devices={devices} nodePositions={nodePositions} />
 
           {/* AHU units */}
           <AHUNodes />

@@ -8,7 +8,7 @@ import { useFacilityData } from '@/hooks/useFacilityData';
 export default function Index() {
   const [activeView, setActiveView] = useState<'map' | 'alerts'>('map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const { buildingStats, devices } = useFacilityData();
+  const { buildingStats, devices, nodePositions } = useFacilityData();
   const selectedDevice = devices.find(device => device.id === selectedDeviceId) ?? null;
 
   const handleDeviceSelect = (deviceId: string) => {
@@ -24,6 +24,7 @@ export default function Index() {
         {activeView === 'map' ? (
           <FacilityMap
             devices={devices}
+            nodePositions={nodePositions}
             onDeviceSelect={(device) => setSelectedDeviceId(device.id)}
             selectedDeviceId={selectedDeviceId}
           />

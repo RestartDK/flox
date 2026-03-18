@@ -1,6 +1,7 @@
 export type DeviceStatus = 'healthy' | 'warning' | 'fault' | 'offline';
 export type LiveNodeStatus = 'healthy' | 'warning' | 'critical' | 'offline';
 export type DeviceType = 'actuator' | 'damper' | 'valve';
+export type AirflowDirection = 'supply' | 'return' | null;
 export type FacilityNodeType = 'system' | 'ahu' | DeviceType;
 
 export interface TelemetryPoint {
@@ -32,6 +33,7 @@ export interface Device {
   y: number;
   installedDate: string;
   anomalyScore: number;
+  airflowDirection: AirflowDirection;
   torque: TelemetryPoint[];
   position: TelemetryPoint[];
   temperature: TelemetryPoint[];
@@ -71,6 +73,7 @@ export interface LiveNode {
   label: string;
   type: FacilityNodeType;
   status: LiveNodeStatus;
+  position: number; // 0-1 decimal, valve/damper open percentage driving airflow speed
   parentIds: string[];
   fault: LiveFault | null;
 }
@@ -103,6 +106,7 @@ interface DeviceTemplate {
   y: number;
   installedDate: string;
   baseAnomalyScore: number;
+  airflowDirection: AirflowDirection;
   torque: TelemetryPoint[];
   position: TelemetryPoint[];
   temperature: TelemetryPoint[];
@@ -161,49 +165,49 @@ const deviceTemplates: DeviceTemplate[] = [
   {
     id: 'BEL-ACT-001', name: 'Kitchen Supply Actuator', model: 'LMV-D3', serial: 'SN-88421',
     type: 'actuator', zone: 'Kitchen', zoneId: 'zone-kitchen',
-    x: 160, y: 210, installedDate: '2024-06-15', baseAnomalyScore: 0.12,
+    x: 160, y: 210, installedDate: '2024-06-15', baseAnomalyScore: 0.12, airflowDirection: 'supply',
     torque: generateTelemetry(4.2, 0.8), position: generateTelemetry(72, 15), temperature: generateTelemetry(23, 2),
   },
   {
     id: 'BEL-DMP-002', name: 'Kitchen Exhaust Damper', model: 'NMV-D2M', serial: 'SN-88422',
     type: 'damper', zone: 'Kitchen', zoneId: 'zone-kitchen',
-    x: 80, y: 100, installedDate: '2024-06-15', baseAnomalyScore: 0.08,
+    x: 80, y: 100, installedDate: '2024-06-15', baseAnomalyScore: 0.08, airflowDirection: 'return',
     torque: generateTelemetry(3.8, 0.5), position: generateTelemetry(65, 10), temperature: generateTelemetry(22, 1.5),
   },
   {
     id: 'BEL-VLV-003', name: 'Living Room Chiller Valve', model: 'R2025-S2', serial: 'SN-71004',
     type: 'valve', zone: 'Living Room', zoneId: 'zone-living',
-    x: 550, y: 100, installedDate: '2023-11-20', baseAnomalyScore: 0.91,
+    x: 550, y: 100, installedDate: '2023-11-20', baseAnomalyScore: 0.91, airflowDirection: null,
     torque: generateTelemetry(6.8, 2.5, true), position: generateTelemetry(45, 30, true), temperature: generateTelemetry(28, 5, true),
   },
   {
     id: 'BEL-ACT-004', name: 'Living Room Damper Actuator', model: 'LMV-D3', serial: 'SN-71005',
     type: 'actuator', zone: 'Living Room', zoneId: 'zone-living',
-    x: 700, y: 200, installedDate: '2024-01-10', baseAnomalyScore: 0.64,
+    x: 700, y: 200, installedDate: '2024-01-10', baseAnomalyScore: 0.64, airflowDirection: 'supply',
     torque: generateTelemetry(5.1, 1.8, true), position: generateTelemetry(80, 20), temperature: generateTelemetry(26, 3),
   },
   {
     id: 'BEL-VLV-005', name: 'Bathroom Water Valve', model: 'AF24-MFT', serial: 'SN-55301',
     type: 'valve', zone: 'Bathroom', zoneId: 'zone-bath',
-    x: 100, y: 380, installedDate: '2024-03-22', baseAnomalyScore: 0.52,
+    x: 100, y: 380, installedDate: '2024-03-22', baseAnomalyScore: 0.52, airflowDirection: null,
     torque: generateTelemetry(3.2, 1.2), position: generateTelemetry(55, 18), temperature: generateTelemetry(21, 2),
   },
   {
     id: 'BEL-DMP-006', name: 'Bedroom 1 Supply Damper', model: 'R2015-S1', serial: 'SN-55302',
     type: 'damper', zone: 'Bedroom 1', zoneId: 'zone-bed1',
-    x: 700, y: 450, installedDate: '2025-01-08', baseAnomalyScore: 0.05,
+    x: 700, y: 450, installedDate: '2025-01-08', baseAnomalyScore: 0.05, airflowDirection: 'supply',
     torque: generateTelemetry(2.8, 0.4), position: generateTelemetry(60, 8), temperature: generateTelemetry(42, 3),
   },
   {
     id: 'BEL-ACT-007', name: 'Bedroom 1 Return Actuator', model: 'LMV-D3', serial: 'SN-99100',
     type: 'actuator', zone: 'Bedroom 1', zoneId: 'zone-bed1',
-    x: 750, y: 550, installedDate: '2025-02-14', baseAnomalyScore: 0.03,
+    x: 750, y: 550, installedDate: '2025-02-14', baseAnomalyScore: 0.03, airflowDirection: 'return',
     torque: generateTelemetry(3.5, 0.3), position: generateTelemetry(70, 5), temperature: generateTelemetry(22, 1),
   },
   {
     id: 'BEL-DMP-008', name: 'Bedroom 2 Fresh Air Damper', model: 'NMV-D2M', serial: 'SN-99101',
     type: 'damper', zone: 'Bedroom 2', zoneId: 'zone-bed2',
-    x: 350, y: 520, installedDate: '2025-02-14', baseAnomalyScore: 0.07,
+    x: 350, y: 520, installedDate: '2025-02-14', baseAnomalyScore: 0.07, airflowDirection: 'supply',
     torque: generateTelemetry(2.9, 0.5), position: generateTelemetry(50, 10), temperature: generateTelemetry(20, 1.5),
   },
 ];
@@ -229,6 +233,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'AHU 01',
       type: 'ahu',
       status: 'warning',
+      position: 0.92,
       parentIds: [],
       fault: null,
     },
@@ -237,6 +242,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'AHU 02',
       type: 'ahu',
       status: 'warning',
+      position: 0.55,
       parentIds: [],
       fault: null,
     },
@@ -245,6 +251,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Kitchen Supply Actuator',
       type: 'actuator',
       status: 'healthy',
+      position: 0.95,
       parentIds: ['ahu-01'],
       fault: null,
     },
@@ -253,6 +260,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Kitchen Exhaust Damper',
       type: 'damper',
       status: 'healthy',
+      position: 0,
       parentIds: ['ahu-01'],
       fault: null,
     },
@@ -261,6 +269,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Living Room Chiller Valve',
       type: 'valve',
       status: 'critical',
+      position: 0.12,
       parentIds: ['ahu-01'],
       fault: {
         id: 'fault-003',
@@ -276,6 +285,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Living Room Damper Actuator',
       type: 'actuator',
       status: 'warning',
+      position: 0.88,
       parentIds: ['ahu-01'],
       fault: {
         id: 'fault-004',
@@ -291,6 +301,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bathroom Water Valve',
       type: 'valve',
       status: 'warning',
+      position: 0,
       parentIds: ['ahu-02'],
       fault: {
         id: 'fault-005',
@@ -306,6 +317,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 1 Supply Damper',
       type: 'damper',
       status: 'healthy',
+      position: 1.0,
       parentIds: ['ahu-02'],
       fault: null,
     },
@@ -314,6 +326,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 1 Return Actuator',
       type: 'actuator',
       status: 'healthy',
+      position: 0.08,
       parentIds: ['ahu-02'],
       fault: null,
     },
@@ -322,6 +335,7 @@ export const initialFacilityNodesResponse: FacilityNodesResponse = {
       label: 'Bedroom 2 Fresh Air Damper',
       type: 'damper',
       status: 'healthy',
+      position: 0.42,
       parentIds: ['ahu-02'],
       fault: null,
     },
@@ -370,6 +384,7 @@ const buildDevice = (template: DeviceTemplate, liveNode: LiveNode | undefined, g
     y: template.y,
     installedDate: template.installedDate,
     anomalyScore,
+    airflowDirection: template.airflowDirection,
     torque: template.torque,
     position: template.position,
     temperature: template.temperature,

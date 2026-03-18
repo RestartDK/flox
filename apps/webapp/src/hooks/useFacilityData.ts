@@ -31,12 +31,17 @@ export const useFacilityData = () => {
 
   const devices = useMemo(() => buildDevicesFromNodes(query.data), [query.data]);
   const buildingStats = useMemo(() => buildBuildingStats(devices), [devices]);
+  const nodePositions = useMemo(
+    () => Object.fromEntries(query.data.nodes.map(n => [n.id, n.position])),
+    [query.data],
+  );
 
   return {
     ...query,
     ahuUnits,
     buildingStats,
     devices,
+    nodePositions,
     generatedAt: query.data.generatedAt,
   };
 };
