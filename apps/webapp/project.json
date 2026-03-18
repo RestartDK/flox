@@ -8,7 +8,7 @@
       "executor": "nx:run-commands",
       "options": {
         "cwd": "apps/webapp",
-        "command": "bun run dev"
+        "command": "bun run dev -- --host 0.0.0.0 --port 3000"
       }
     },
     "build": {
@@ -17,7 +17,7 @@
         "cwd": "apps/webapp",
         "command": "bun run build"
       },
-      "outputs": ["{projectRoot}/.next"]
+      "outputs": ["{projectRoot}/dist"]
     },
     "start": {
       "executor": "nx:run-commands",
@@ -38,6 +38,13 @@
       "options": {
         "cwd": "apps/webapp",
         "command": "bun run typecheck"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "apps/webapp",
+        "command": "bun run test"
       }
     }
   }

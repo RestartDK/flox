@@ -19,7 +19,7 @@ NX         := $(BUN) x nx
 
 init: bootstrap ## First-time setup (alias for bootstrap)
 
-dev: run.webapp ## Start the Next.js webapp (fastest entry point)
+dev: run.webapp ## Start the Vite webapp (fastest entry point)
 
 ## ── Environment Setup ────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ lift.database: ## Start database services (postgres/mongodb)
 
 ## ── Run Applications ─────────────────────────────────────────────────────────
 
-run.webapp: ## Start Next.js webapp with bun (dev + turbopack)
+run.webapp: ## Start Vite webapp with bun
 	@echo "Starting webapp at http://localhost:3000"
 	@$(NX) run webapp:dev
 
@@ -184,7 +184,7 @@ help: ## Show this help
 	@echo ""
 	@echo "  Quick start:"
 	@echo "    make init         - First-time setup"
-	@echo "    make dev          - Start Next.js webapp"
+	@echo "    make dev          - Start Vite webapp"
 	@echo "    make up           - Start Docker services"
 	@echo ""
 	@grep -E '^[a-zA-Z_.%-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
