@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { ModeToggle } from '@/components/mode-toggle';
 import { ahuUnits, type Device } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -32,7 +33,7 @@ const DeviceNode = ({ device, selected, onClick }: { device: Device; selected: b
       <TooltipTrigger asChild>
         <motion.g
           onClick={onClick}
-          className="cursor-pointer"
+          style={{ cursor: 'pointer' }}
           whileHover={{ scale: 1.15 }}
           transition={{ duration: 0.12, ease: [0.2, 0, 0, 1] }}
         >
@@ -248,6 +249,7 @@ const AHUNodes = () => (
 export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
 
   const clampTransform = useCallback((x: number, y: number, scale: number) => {
     const s = Math.min(Math.max(scale, 0.5), 4);
@@ -262,6 +264,8 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
 
   useGesture(
     {
+      onDragStart: () => setIsDragging(true),
+      onDragEnd: () => setIsDragging(false),
       onDrag: ({ delta: [dx, dy], event }) => {
         event.preventDefault();
         setTransform(t => clampTransform(t.x + dx, t.y + dy, t.scale));
@@ -296,19 +300,7 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
           <h1 className="font-display text-lg tracking-tight">Facility Overview</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">2-Bedroom Apartment · 78 m² · {devices.length} devices connected</p>
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-          {['healthy', 'warning', 'fault'].map(s => (
-            <span key={s} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${statusColor[s]})` }} />
-              <span className="capitalize">{s}</span>
-            </span>
-          ))}
-          <span className="border-l border-border pl-4 flex items-center gap-1.5">
-            <span className="font-display">A</span> Actuator
-            <span className="font-display ml-2">D</span> Damper
-            <span className="font-display ml-2">V</span> Valve
-          </span>
-        </div>
+        <ModeToggle />
       </div>
 
       <motion.div
@@ -317,7 +309,7 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
         transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
         className="border border-border bg-card overflow-hidden flex-1 relative touch-none"
         ref={containerRef}
-        style={{ cursor: 'grab' }}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       >
         {/* Zoom controls */}
         <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
@@ -335,6 +327,21 @@ export default function FacilityMap({ devices, onDeviceSelect, selectedDeviceId 
         {/* Zoom level indicator */}
         <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted-foreground font-display bg-secondary/80 px-2 py-1 border border-border">
           {Math.round(transform.scale * 100)}%
+        </div>
+
+        {/* Legend */}
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-secondary/80 px-3 py-1.5 border border-border">
+          {['healthy', 'warning', 'fault'].map(s => (
+            <span key={s} className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `hsl(${statusColor[s]})` }} />
+              <span className="capitalize">{s}</span>
+            </span>
+          ))}
+          <span className="border-l border-border pl-3 flex items-center gap-1.5">
+            <span className="font-display">A</span>Act
+            <span className="font-display ml-1">D</span>Dmp
+            <span className="font-display ml-1">V</span>Vlv
+          </span>
         </div>
 
         <svg

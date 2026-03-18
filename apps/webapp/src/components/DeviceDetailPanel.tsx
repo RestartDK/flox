@@ -27,11 +27,11 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
     <AnimatePresence>
       {device && (
         <motion.div
-          initial={{ x: 320, opacity: 0 }}
+          initial={{ x: 360, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 320, opacity: 0 }}
+          exit={{ x: 360, opacity: 0 }}
           transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
-          className="w-[360px] h-screen border-l border-border bg-card overflow-y-auto shrink-0"
+          className="absolute right-0 top-0 w-[360px] h-full z-30 border-l border-border bg-card overflow-y-auto shadow-xl"
         >
           {/* Header */}
           <div className="px-5 py-4 border-b border-border flex items-start justify-between">
