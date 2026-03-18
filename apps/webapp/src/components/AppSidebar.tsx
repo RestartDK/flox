@@ -1,21 +1,11 @@
 import { type BuildingStats } from '@/data/mockDevices';
-import { ModeToggle } from '@/components/mode-toggle';
-import { Activity, AlertTriangle, Map, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Map, type LucideIcon } from 'lucide-react';
 
 interface AppSidebarProps {
   activeView: 'map' | 'alerts';
   onViewChange: (view: 'map' | 'alerts') => void;
   buildingStats: BuildingStats;
 }
-
-const StatBlock = ({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) => (
-  <div className="px-4 py-3">
-    <div className="label-caps mb-1">{label}</div>
-    <div className={`font-display text-xl tracking-tight ${accent ? 'text-accent' : 'text-foreground'}`}>
-      {value}
-    </div>
-  </div>
-);
 
 const NavItem = ({ icon: Icon, label, active, onClick }: { icon: LucideIcon; label: string; active: boolean; onClick: () => void }) => (
   <button
@@ -34,15 +24,9 @@ export default function AppSidebar({ activeView, onViewChange, buildingStats }: 
     <aside className="w-[260px] h-screen bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
       {/* Header */}
       <div className="px-4 py-5 border-b border-sidebar-border">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-display text-sm tracking-tight text-foreground flex items-center gap-2">
-              <Activity size={16} className="text-accent" />
-              VAULT / HVAC
-            </div>
-            <div className="text-[11px] text-muted-foreground mt-1">Belimo Observability Platform</div>
-          </div>
-          <ModeToggle />
+        <div className="font-display text-sm tracking-tight text-foreground flex items-center gap-2">
+          <img src="/favicon.svg" alt="" className="w-5 h-5 shrink-0" aria-hidden />
+          Flox
         </div>
       </div>
 
@@ -50,15 +34,6 @@ export default function AppSidebar({ activeView, onViewChange, buildingStats }: 
       <div className="py-2 border-b border-sidebar-border">
         <NavItem icon={Map} label="Facility Map" active={activeView === 'map'} onClick={() => onViewChange('map')} />
         <NavItem icon={AlertTriangle} label="Alert Dashboard" active={activeView === 'alerts'} onClick={() => onViewChange('alerts')} />
-      </div>
-
-      {/* Building Health */}
-      <div className="py-2 border-b border-sidebar-border">
-        <div className="label-caps px-4 py-2">Building Health</div>
-        <StatBlock label="Overall Score" value={`${buildingStats.overallHealth}%`} accent />
-        <StatBlock label="Active Faults" value={buildingStats.activeFaults} />
-        <StatBlock label="Energy Waste" value={buildingStats.energyWaste} />
-        <StatBlock label="Est. Daily Cost" value={buildingStats.estimatedCost} />
       </div>
 
       {/* Device Summary */}
@@ -79,10 +54,6 @@ export default function AppSidebar({ activeView, onViewChange, buildingStats }: 
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-sidebar-border text-[11px] text-muted-foreground">
-        v1.0 — March 2026
-      </div>
     </aside>
   );
 }

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { type Device, type Fault } from '@/data/mockDevices';
 import { ChevronRight, Zap } from 'lucide-react';
 
@@ -51,18 +50,15 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
             { label: 'High', count: alerts.filter(a => a.fault.severity === 'high').length, color: 'border-status-warning/30', text: 'text-status-warning' },
             { label: 'Medium', count: alerts.filter(a => a.fault.severity === 'medium').length, color: 'border-border', text: 'text-muted-foreground' },
             { label: 'Total Energy Waste', count: totalEnergyWaste, color: 'border-border', text: 'text-foreground', wide: true },
-          ].map((s, i) => (
-          <motion.div
+          ].map(s => (
+          <div
             key={s.label}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05, duration: 0.15, ease: [0.2, 0, 0, 1] }}
             className={`border bg-card p-4 cursor-pointer ${severityFilter === s.label.toLowerCase() ? 'border-foreground' : s.color}`}
             onClick={() => setSeverityFilter(severityFilter === s.label.toLowerCase() ? null : s.label === 'Total Energy Waste' ? null : s.label.toLowerCase())}
           >
             <div className="label-caps">{s.label}</div>
             <div className={`font-display text-2xl mt-1 ${s.text}`}>{s.count}</div>
-          </motion.div>
+          </div>
         ))}
       </div>
 
@@ -77,12 +73,9 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
           <span className="w-8" />
         </div>
 
-        {filtered.map((alert, i) => (
-          <motion.div
+        {filtered.map(alert => (
+          <div
             key={alert.fault.id}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.03, duration: 0.15, ease: [0.2, 0, 0, 1] }}
             className="data-row cursor-pointer group"
             onClick={() => onNavigateToDevice(alert.device)}
           >
@@ -103,7 +96,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
             <div className="w-8 flex justify-end">
               <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
-          </motion.div>
+          </div>
         ))}
 
         {filtered.length === 0 && (

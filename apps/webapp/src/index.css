@@ -141,7 +141,7 @@
   }
 
   .data-row {
-    @apply h-10 flex items-center px-4 border-b border-border transition-colors;
+    @apply flex items-center px-4 py-3 border-b border-border transition-colors;
   }
 
   .data-row:hover {
