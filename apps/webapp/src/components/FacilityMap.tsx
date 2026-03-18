@@ -247,8 +247,8 @@ const FloorPlanBase = () => (
 
 const RING_COUNT = 3;
 const airflowColor: Record<NonNullable<AirflowDirection>, string> = {
-  supply: 'var(--brand)',
-  return: '210 80% 55%',
+  supply: '175 65% 48%',
+  return: '270 50% 62%',
 };
 
 const AirflowRing = ({ cx, cy, direction, delay, duration, color }: {
