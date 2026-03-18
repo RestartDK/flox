@@ -5,7 +5,7 @@ Scaffold for any project: webapp, API, ML pipeline, scraper, worker, CLI, or SDK
 ## Project Layout
 
 ```
-apps/webapp/          Next.js 15 + React 19 + Tailwind 4 (Bun, Turbopack, auth optional)
+apps/webapp/          Vite + React + Tailwind (Bun, auth optional)
 apps/webapp-minimal/  Streamlit prototype
 apps/backend/fastapi/ FastAPI server
 apps/backend/flask/   Flask server
@@ -52,6 +52,6 @@ Use in Claude Code sessions (type `/`):
 - `/plan` - plan an implementation within this boilerplate
 - `/build` - implement a feature end-to-end
 - `/api` - scaffold a backend endpoint
-- `/page` - scaffold a Next.js page
+- `/page` - scaffold a webapp page
 - `/review` - review recent changes
 - `/ship` - commit staged changes
