@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { type Device, type Fault } from '@/data/mockDevices';
-import { ChevronRight, Zap } from 'lucide-react';
+import { useResolveFault } from '@/hooks/useFacilityData';
+import { Zap, Check, Loader2 } from 'lucide-react';
 
 interface AlertDashboardProps {
   devices: Device[];
@@ -22,12 +23,13 @@ const parseEnergyWaste = (value: string) => {
 const severityBadge: Record<string, string> = {
   critical: 'bg-status-fault/15 text-status-fault border-status-fault/30',
   high: 'bg-status-warning/15 text-status-warning border-status-warning/30',
-  medium: 'bg-muted text-muted-foreground border-border',
+  medium: 'bg-status-warning/15 text-status-warning border-status-warning/30',
   low: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDashboardProps) {
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const { mutate: resolve, pendingFaultId } = useResolveFault();
 
   const alerts: AlertItem[] = devices
     .flatMap(device => device.faults.map(fault => ({ device, fault })))
@@ -70,34 +72,44 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
           <span className="label-caps w-28">Zone</span>
           <span className="label-caps w-24">Impact</span>
           <span className="label-caps w-20">Severity</span>
-          <span className="w-8" />
+          <span className="w-20" />
         </div>
 
-        {filtered.map(alert => (
-          <div
-            key={alert.fault.id}
-            className="data-row cursor-pointer group"
-            onClick={() => onNavigateToDevice(alert.device)}
-          >
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium truncate">{alert.fault.type}</div>
-              <div className="text-[11px] text-muted-foreground truncate">{alert.fault.diagnosis.slice(0, 80)}…</div>
+        {filtered.map(alert => {
+          const isPending = pendingFaultId === alert.fault.id;
+          return (
+            <div
+              key={alert.fault.id}
+              className={`data-row cursor-pointer group ${isPending ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={() => onNavigateToDevice(alert.device)}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium truncate">{alert.fault.type}</div>
+                <div className="text-[11px] text-muted-foreground truncate">{alert.fault.diagnosis.slice(0, 80)}...</div>
+              </div>
+              <div className="w-28 text-[12px] font-display text-secondary-foreground">{alert.device.id}</div>
+              <div className="w-28 text-[12px] text-muted-foreground truncate">{alert.device.zone}</div>
+              <div className="w-24">
+                <div className="text-[12px] font-display text-foreground flex items-center gap-1"><Zap size={10} />{alert.fault.energyWaste}</div>
+              </div>
+              <div className="w-20">
+                <span className={`inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[alert.fault.severity]}`}>
+                  {alert.fault.severity}
+                </span>
+              </div>
+              <div className="w-20 flex justify-end">
+                <button
+                  disabled={isPending}
+                  onClick={(e) => { e.stopPropagation(); resolve(alert.fault.id); }}
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isPending ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                  {isPending ? 'Resolving...' : 'Resolve'}
+                </button>
+              </div>
             </div>
-            <div className="w-28 text-[12px] font-display text-secondary-foreground">{alert.device.id}</div>
-            <div className="w-28 text-[12px] text-muted-foreground truncate">{alert.device.zone}</div>
-            <div className="w-24">
-              <div className="text-[12px] font-display text-foreground flex items-center gap-1"><Zap size={10} />{alert.fault.energyWaste}</div>
-            </div>
-            <div className="w-20">
-              <span className={`inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[alert.fault.severity]}`}>
-                {alert.fault.severity}
-              </span>
-            </div>
-            <div className="w-8 flex justify-end">
-              <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {filtered.length === 0 && (
           <div className="py-12 text-center text-[13px] text-muted-foreground">
