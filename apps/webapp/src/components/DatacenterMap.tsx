@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
+import PageHeader from '@/components/PageHeader';
 import { type AHUUnit, type Device } from '@/types/facility';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -21,10 +22,40 @@ const statusColor: Record<string, string> = {
   offline: 'var(--status-offline)',
 };
 
-const deviceIcon: Record<string, string> = {
-  actuator: 'A',
-  damper: 'D',
-  valve: 'V',
+const formatAnomalyConfidence = (value: number) => `${Math.round(value * 100)}%`;
+
+const DeviceIconSVG = ({ type, color }: { type: string; color: string }) => {
+  switch (type) {
+    case 'actuator':
+      return (
+        <g stroke={color} strokeWidth={1.5} strokeLinecap="round">
+          <circle r={5.5} fill="none" />
+          <line x1={0} y1={-5.5} x2={0} y2={-2.5} />
+          <line x1={5.5} y1={0} x2={2.5} y2={0} />
+          <line x1={0} y1={5.5} x2={0} y2={2.5} />
+          <line x1={-5.5} y1={0} x2={-2.5} y2={0} />
+          <circle r={2} fill={color} stroke="none" />
+        </g>
+      );
+    case 'damper':
+      return (
+        <g stroke={color} strokeWidth={1.5} strokeLinecap="round">
+          <rect x={-5.5} y={-4} width={11} height={8} rx={0.5} fill="none" />
+          <line x1={-3.5} y1={3} x2={3.5} y2={-3} />
+        </g>
+      );
+    case 'valve':
+      return (
+        <g stroke={color} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M-5,-3 L0,1 L-5,5 Z" fill={color} strokeWidth={0.5} />
+          <path d="M5,-3 L0,1 L5,5 Z" fill={color} strokeWidth={0.5} />
+          <line x1={0} y1={1} x2={0} y2={-5} strokeWidth={1.5} />
+          <line x1={-2.5} y1={-5} x2={2.5} y2={-5} strokeWidth={2} />
+        </g>
+      );
+    default:
+      return null;
+  }
 };
 
 const ductDevicePositions: Record<string, { x: number; y: number }> = {
@@ -130,18 +161,9 @@ const DeviceNode = ({
             stroke={color}
             strokeWidth={1.5}
           />
-          <text
-            x={position.x}
-            y={position.y + 1}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill={color}
-            fontSize={9}
-            fontWeight={600}
-            fontFamily="var(--font-display)"
-          >
-            {deviceIcon[device.type]}
-          </text>
+          <g transform={`translate(${position.x},${position.y})`}>
+            <DeviceIconSVG type={device.type} color={color} />
+          </g>
         </motion.g>
       </TooltipTrigger>
       <TooltipContent side="top" className="bg-popover border-border text-popover-foreground p-0">
@@ -154,7 +176,7 @@ const DeviceNode = ({
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
             <span className="text-[11px] capitalize">{device.status}</span>
             <span className="text-[11px] text-muted-foreground ml-1">
-              Score: {device.anomalyScore.toFixed(2)}
+              Confidence Anomaly: {formatAnomalyConfidence(device.anomalyScore)}
             </span>
           </div>
         </div>
@@ -395,18 +417,14 @@ export default function DatacenterMap({
   const resetView = () => setTransform({ x: 0, y: 0, scale: 1 });
 
   return (
-    <div className="flex-1 p-6 flex flex-col overflow-hidden">
-      <div className="mb-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="font-display text-lg tracking-tight">Datacenter Overview</h1>
-          <p className="text-[13px] text-muted-foreground mt-0.5">
-            Cold air enters through the lower supply ducts and exhaust leaves through the upper plenum.
-          </p>
-        </div>
-        <ModeToggle />
-      </div>
-
-      <motion.div
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <PageHeader
+        title="Datacenter Overview"
+        subtitle={`Rows A-F · ${devices.length} devices`}
+        actions={<ModeToggle />}
+      />
+      <div className="flex-1 p-6 flex flex-col overflow-hidden">
+        <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
@@ -417,45 +435,50 @@ export default function DatacenterMap({
         <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
           <button
             onClick={zoomIn}
-            className="w-8 h-8 flex items-center justify-center bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
           >
             <ZoomIn size={14} />
           </button>
           <button
             onClick={zoomOut}
-            className="w-8 h-8 flex items-center justify-center bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
           >
             <ZoomOut size={14} />
           </button>
           <button
             onClick={resetView}
-            className="w-8 h-8 flex items-center justify-center bg-secondary border border-border text-muted-foreground hover:text-foreground transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
           >
             <Maximize size={14} />
           </button>
         </div>
 
-        <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted-foreground font-display bg-secondary/80 px-2 py-1 border border-border">
+        <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted-foreground font-display bg-card/90 px-2 py-1 border border-border rounded-md shadow-sm">
           {Math.round(transform.scale * 100)}%
         </div>
 
-        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-secondary px-3 py-1.5 border border-border">
+        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-card px-3 py-1.5 border border-border rounded-md shadow-sm">
           {['healthy', 'warning', 'fault'].map((status) => (
             <span key={status} className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `hsl(${statusColor[status]})` }} />
               <span className="capitalize">{status}</span>
             </span>
           ))}
+          <span className="border-l border-border pl-3 flex items-center gap-2.5">
+            {(['actuator', 'damper', 'valve'] as const).map((type, index) => (
+              <span key={type} className="flex items-center gap-1">
+                <svg width={14} height={14} viewBox="-7 -7 14 14">
+                  <DeviceIconSVG type={type} color="currentColor" />
+                </svg>
+                <span>{['Act', 'Dmp', 'Vlv'][index]}</span>
+              </span>
+            ))}
+          </span>
           <span className="border-l border-border pl-3 flex items-center gap-2">
             <span className="w-4 h-1 rounded-full" style={{ backgroundColor: `hsl(${supplyPalette})` }} />
             <span>Supply</span>
             <span className="w-4 h-1 rounded-full ml-2" style={{ backgroundColor: `hsl(${exhaustPalette})` }} />
             <span>Exhaust</span>
-          </span>
-          <span className="border-l border-border pl-3 flex items-center gap-1.5">
-            <span className="font-display">A</span>Act
-            <span className="font-display ml-1">D</span>Dmp
-            <span className="font-display ml-1">V</span>Vlv
           </span>
         </div>
 
@@ -479,7 +502,8 @@ export default function DatacenterMap({
             />
           ))}
         </svg>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }
