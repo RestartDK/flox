@@ -408,7 +408,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   };
 
   return (
-    <div className="flex-1 p-6 overflow-hidden flex flex-col">
+    <div className="flex-1 px-6 pt-5 pb-6 overflow-hidden flex flex-col">
       <div className="mb-4">
         <h1 className="font-display text-lg tracking-tight">Operations Agent</h1>
         <p className="text-[13px] text-muted-foreground mt-0.5">

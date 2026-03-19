@@ -39,7 +39,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
   const totalEnergyWaste = `${alerts.reduce((sum, alert) => sum + parseEnergyWaste(alert.fault.energyWaste), 0).toLocaleString()} kWh/day`;
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
+    <div className="flex-1 px-6 pt-5 pb-6 overflow-y-auto">
       <div className="mb-6">
         <h1 className="font-display text-lg tracking-tight">Alert Dashboard</h1>
         <p className="text-[13px] text-muted-foreground mt-0.5">{alerts.length} active faults across {new Set(alerts.map(a => a.device.id)).size} devices</p>
@@ -55,7 +55,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
           ].map(s => (
           <div
             key={s.label}
-            className={`border bg-card p-4 cursor-pointer ${severityFilter === s.label.toLowerCase() ? 'border-foreground' : s.color}`}
+            className={`border bg-card p-4 cursor-pointer shadow-sm hover:shadow-md transition-shadow ${severityFilter === s.label.toLowerCase() ? 'card-accent-top border-foreground' : s.color}`}
             onClick={() => setSeverityFilter(severityFilter === s.label.toLowerCase() ? null : s.label === 'Total Energy Waste' ? null : s.label.toLowerCase())}
           >
             <div className="label-caps">{s.label}</div>
@@ -66,7 +66,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
 
       {/* Alert list */}
       <div className="border border-border bg-card">
-        <div className="data-row border-b border-border">
+        <div className="data-row border-b border-border data-row-header">
           <span className="label-caps flex-1">Fault</span>
           <span className="label-caps w-28">Device</span>
           <span className="label-caps w-28">Zone</span>

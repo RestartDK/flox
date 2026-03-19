@@ -47,10 +47,10 @@ const DeviceIconSVG = ({ type, color }: { type: string; color: string }) => {
     case 'valve': // bow-tie body + stem + crossbar handle
       return (
         <g stroke={color} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M-5,-4 L0,0 L-5,4 Z" fill={color} strokeWidth={0.5} />
-          <path d="M5,-4 L0,0 L5,4 Z" fill={color} strokeWidth={0.5} />
-          <line x1={0} y1={0} x2={0} y2={-6} strokeWidth={1.5} />
-          <line x1={-2.5} y1={-6} x2={2.5} y2={-6} strokeWidth={2} />
+          <path d="M-5,-3 L0,1 L-5,5 Z" fill={color} strokeWidth={0.5} />
+          <path d="M5,-3 L0,1 L5,5 Z" fill={color} strokeWidth={0.5} />
+          <line x1={0} y1={1} x2={0} y2={-5} strokeWidth={1.5} />
+          <line x1={-2.5} y1={-5} x2={2.5} y2={-5} strokeWidth={2} />
         </g>
       );
     default:
@@ -386,7 +386,7 @@ export default function FacilityMap({ ahuUnits, devices, nodePositions, onDevice
   const resetView = () => setTransform({ x: 0, y: 0, scale: 1 });
 
   return (
-    <div className="flex-1 p-6 flex flex-col overflow-hidden">
+    <div className="flex-1 px-6 pt-5 pb-6 flex flex-col overflow-hidden">
       <div className="mb-4 flex items-center justify-between shrink-0">
         <div>
           <h1 className="font-display text-lg tracking-tight">Facility Overview</h1>
