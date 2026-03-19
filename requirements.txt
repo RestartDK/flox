@@ -33,3 +33,8 @@ anthropic
 # torch
 # tensorboard
 influxdb-client
+numpy
+pandas
+scikit-learn
+scipy
+xgboost

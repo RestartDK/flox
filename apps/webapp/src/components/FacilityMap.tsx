@@ -3,10 +3,11 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
-import { ahuUnits, type Device, type AirflowDirection } from '@/data/mockDevices';
+import { type AHUUnit, type Device, type AirflowDirection } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FacilityMapProps {
+  ahuUnits: AHUUnit[];
   devices: Device[];
   nodePositions: Record<string, number>;
   onDeviceSelect: (device: Device) => void;
@@ -286,7 +287,7 @@ const AirflowOverlay = ({ devices, nodePositions }: { devices: Device[]; nodePos
   </g>
 );
 
-const AHUNodes = () => (
+const AHUNodes = ({ ahuUnits }: { ahuUnits: AHUUnit[] }) => (
   <g>
     {ahuUnits.map(ahu => (
       <g key={ahu.id}>
@@ -305,7 +306,7 @@ const AHUNodes = () => (
   </g>
 );
 
-export default function FacilityMap({ devices, nodePositions, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
+export default function FacilityMap({ ahuUnits, devices, nodePositions, onDeviceSelect, selectedDeviceId }: FacilityMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
@@ -440,7 +441,7 @@ export default function FacilityMap({ devices, nodePositions, onDeviceSelect, se
           <AirflowOverlay devices={devices} nodePositions={nodePositions} />
 
           {/* AHU units */}
-          <AHUNodes />
+          <AHUNodes ahuUnits={ahuUnits} />
 
           {/* Devices */}
           {devices.map(device => (

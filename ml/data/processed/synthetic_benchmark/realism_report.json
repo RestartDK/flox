@@ -1,0 +1,265 @@
+{
+  "reference": {
+    "real_window_count": 259,
+    "latent_dim": 3,
+    "pca_explained_variance_ratio": [
+      0.35481202602386475,
+      0.10949251800775528,
+      0.1005653366446495
+    ],
+    "participation_ratio": 2.1560258371172325,
+    "knn_distance": {
+      "mean": 3.7236481509153445,
+      "median": 3.593815326690674
+    }
+  },
+  "synthetic": {
+    "window_count": 15025,
+    "pca_explained_variance_ratio": [
+      0.21520163118839264,
+      0.20970915257930756,
+      0.14006677269935608
+    ],
+    "participation_ratio": 2.9042339752207997,
+    "knn_distance": {
+      "mean": 8.203499338525603,
+      "median": 7.961949348449707
+    }
+  },
+  "pca_gap_l2": 0.17633717600480206,
+  "mmd_rbf": 0.3666991591453552,
+  "neighborhood_mixing": {
+    "real_to_synthetic": 0.128957528957529,
+    "synthetic_to_real": 0.17606177606177603
+  },
+  "feature_ks": {
+    "feedback_position_%__mean": {
+      "statistic": 0.33204633204633205,
+      "pvalue": 4.853741939118054e-13
+    },
+    "feedback_position_%__std": {
+      "statistic": 0.6138996138996139,
+      "pvalue": 6.936886791122872e-46
+    },
+    "feedback_position_%__min": {
+      "statistic": 0.23166023166023167,
+      "pvalue": 1.6644843829523153e-06
+    },
+    "feedback_position_%__max": {
+      "statistic": 0.4594594594594595,
+      "pvalue": 4.919234424344086e-25
+    },
+    "feedback_position_%__last_first": {
+      "statistic": 0.277992277992278,
+      "pvalue": 3.23819490843572e-09
+    },
+    "setpoint_position_%__mean": {
+      "statistic": 0.08108108108108109,
+      "pvalue": 0.36273346216827607
+    },
+    "setpoint_position_%__std": {
+      "statistic": 0.1891891891891892,
+      "pvalue": 0.00018135920266360361
+    },
+    "setpoint_position_%__min": {
+      "statistic": 0.20463320463320464,
+      "pvalue": 3.6872594957598076e-05
+    },
+    "setpoint_position_%__max": {
+      "statistic": 0.21621621621621623,
+      "pvalue": 1.0260544592677164e-05
+    },
+    "setpoint_position_%__last_first": {
+      "statistic": 0.18532818532818532,
+      "pvalue": 0.00026473286455138827
+    },
+    "position_error_pct__mean": {
+      "statistic": 0.25868725868725867,
+      "pvalue": 5.041439539871235e-08
+    },
+    "position_error_pct__std": {
+      "statistic": 0.19305019305019305,
+      "pvalue": 0.00012325382705296635
+    },
+    "position_error_pct__min": {
+      "statistic": 0.26640926640926643,
+      "pvalue": 1.723723342341295e-08
+    },
+    "position_error_pct__max": {
+      "statistic": 0.23938223938223938,
+      "pvalue": 6.384736532037299e-07
+    },
+    "position_error_pct__last_first": {
+      "statistic": 0.1776061776061776,
+      "pvalue": 0.0005507470715168763
+    },
+    "motor_torque_Nmm__mean": {
+      "statistic": 0.13513513513513514,
+      "pvalue": 0.017564394660709894
+    },
+    "motor_torque_Nmm__std": {
+      "statistic": 0.28185328185328185,
+      "pvalue": 1.8239230357755412e-09
+    },
+    "motor_torque_Nmm__min": {
+      "statistic": 0.23552123552123552,
+      "pvalue": 1.0351012256484712e-06
+    },
+    "motor_torque_Nmm__max": {
+      "statistic": 0.1776061776061776,
+      "pvalue": 0.0005507470715168763
+    },
+    "motor_torque_Nmm__last_first": {
+      "statistic": 0.23938223938223938,
+      "pvalue": 6.384736532037299e-07
+    },
+    "power_W__mean": {
+      "statistic": 0.5482625482625483,
+      "pvalue": 4.257778671508534e-36
+    },
+    "power_W__std": {
+      "statistic": 0.7567567567567568,
+      "pvalue": 6.620898879417561e-73
+    },
+    "power_W__min": {
+      "statistic": 0.5791505791505791,
+      "pvalue": 1.601660087903651e-40
+    },
+    "power_W__max": {
+      "statistic": 0.7142857142857143,
+      "pvalue": 6.078873521848735e-64
+    },
+    "power_W__last_first": {
+      "statistic": 0.2548262548262548,
+      "pvalue": 8.515592176155559e-08
+    },
+    "internal_temperature_deg_C__mean": {
+      "statistic": 0.38223938223938225,
+      "pvalue": 2.9870154358389667e-17
+    },
+    "internal_temperature_deg_C__std": {
+      "statistic": 0.4749034749034749,
+      "pvalue": 8.634334380853138e-27
+    },
+    "internal_temperature_deg_C__min": {
+      "statistic": 0.37065637065637064,
+      "pvalue": 3.1967613267417877e-16
+    },
+    "internal_temperature_deg_C__max": {
+      "statistic": 0.4594594594594595,
+      "pvalue": 4.919234424344086e-25
+    },
+    "internal_temperature_deg_C__last_first": {
+      "statistic": 0.3474903474903475,
+      "pvalue": 2.8792940488850316e-14
+    },
+    "pipe_air_flow_Lpm__mean": {
+      "statistic": 0.4555984555984556,
+      "pvalue": 1.3187734839730952e-24
+    },
+    "pipe_air_flow_Lpm__std": {
+      "statistic": 0.6718146718146718,
+      "pvalue": 8.328301620316415e-56
+    },
+    "pipe_air_flow_Lpm__min": {
+      "statistic": 0.22393822393822393,
+      "pvalue": 4.200214546652955e-06
+    },
+    "pipe_air_flow_Lpm__max": {
+      "statistic": 0.49034749034749037,
+      "pvalue": 1.2926470136725097e-28
+    },
+    "pipe_air_flow_Lpm__last_first": {
+      "statistic": 0.2625482625482625,
+      "pvalue": 2.9601112894656793e-08
+    },
+    "pipe_air_temperature_deg_C__mean": {
+      "statistic": 0.9343629343629344,
+      "pvalue": 1.996229589837117e-123
+    },
+    "pipe_air_temperature_deg_C__std": {
+      "statistic": 0.2084942084942085,
+      "pvalue": 2.4267586457716347e-05
+    },
+    "pipe_air_temperature_deg_C__min": {
+      "statistic": 0.9845559845559846,
+      "pvalue": 1.9723893703698703e-145
+    },
+    "pipe_air_temperature_deg_C__max": {
+      "statistic": 0.8378378378378378,
+      "pvalue": 8.61274319662831e-93
+    },
+    "pipe_air_temperature_deg_C__last_first": {
+      "statistic": 0.13127413127413126,
+      "pvalue": 0.0229507924296022
+    },
+    "pipe_air_flow_ema_8__mean": {
+      "statistic": 0.46332046332046334,
+      "pvalue": 1.8171314496257837e-25
+    },
+    "pipe_air_flow_ema_8__std": {
+      "statistic": 0.7606177606177607,
+      "pvalue": 9.147294504458472e-74
+    },
+    "pipe_air_flow_ema_8__min": {
+      "statistic": 0.2625482625482625,
+      "pvalue": 2.9601112894656793e-08
+    },
+    "pipe_air_flow_ema_8__max": {
+      "statistic": 0.6061776061776062,
+      "pvalue": 1.1736953882871902e-44
+    },
+    "pipe_air_flow_ema_8__last_first": {
+      "statistic": 0.3667953667953668,
+      "pvalue": 6.919818725569114e-16
+    },
+    "pipe_air_temperature_ema_8__mean": {
+      "statistic": 0.9343629343629344,
+      "pvalue": 1.996229589837117e-123
+    },
+    "pipe_air_temperature_ema_8__std": {
+      "statistic": 0.40540540540540543,
+      "pvalue": 2.0424285814147027e-19
+    },
+    "pipe_air_temperature_ema_8__min": {
+      "statistic": 0.972972972972973,
+      "pvalue": 1.268013285078231e-139
+    },
+    "pipe_air_temperature_ema_8__max": {
+      "statistic": 0.8571428571428571,
+      "pvalue": 3.486701250166231e-98
+    },
+    "pipe_air_temperature_ema_8__last_first": {
+      "statistic": 0.18146718146718147,
+      "pvalue": 0.0003833631576276397
+    },
+    "rotation_direction__mode": {
+      "statistic": 0.2471042471042471,
+      "pvalue": 2.3703194717134028e-07
+    },
+    "rotation_direction__change_count": {
+      "statistic": 0.09652509652509653,
+      "pvalue": 0.17911001308860608
+    },
+    "velocity_pct_per_s__mean": {
+      "statistic": 0.26640926640926643,
+      "pvalue": 1.723723342341295e-08
+    },
+    "velocity_pct_per_s__std": {
+      "statistic": 0.5984555984555985,
+      "pvalue": 1.8915867422880927e-43
+    },
+    "velocity_pct_per_s__min": {
+      "statistic": 0.5482625482625483,
+      "pvalue": 4.257778671508534e-36
+    },
+    "velocity_pct_per_s__max": {
+      "statistic": 0.528957528957529,
+      "pvalue": 1.7309260135909523e-33
+    },
+    "velocity_pct_per_s__last_first": {
+      "statistic": 0.23552123552123552,
+      "pvalue": 1.0351012256484712e-06
+    }
+  }
+}

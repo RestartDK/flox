@@ -8,8 +8,7 @@
     "dev": {
       "executor": "nx:run-commands",
       "options": {
-        "cwd": "apps/backend/fastapi",
-        "command": "python3.12 server.py"
+        "command": "PYTHONPATH=. .venv/bin/python apps/backend/fastapi/server.py"
       }
     },
     "build": {

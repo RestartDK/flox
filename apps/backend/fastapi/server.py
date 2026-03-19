@@ -12,11 +12,12 @@ from schemas import (
     ResolveFaultResponse,
     StatusResponse,
 )
-from shacklib.backend_state import ensure_storage_ready, read_state, update_state
+from shacklib.backend_state import ensure_storage_ready, update_state
 from shacklib.diagnosis_engine import (
     build_status_payload,
     ingest_node,
     resolve_fault,
+    seed_mock_state_if_empty,
     utc_now_iso,
 )
 
@@ -41,6 +42,7 @@ async def health():
 @app.on_event("startup")
 async def startup() -> None:
     ensure_storage_ready()
+    update_state(seed_mock_state_if_empty)
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
@@ -60,7 +62,7 @@ async def ingest(payload: IngestPayload) -> IngestResponse:
 
 @app.get("/api/status", response_model=StatusResponse)
 async def status() -> StatusResponse:
-    payload = build_status_payload(read_state())
+    payload = update_state(build_status_payload)
     return StatusResponse.model_validate(payload)
 
 

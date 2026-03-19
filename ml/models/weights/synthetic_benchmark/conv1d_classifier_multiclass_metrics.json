@@ -1,0 +1,155 @@
+{
+  "task": "multiclass",
+  "model_type": "conv1d_classifier",
+  "splits": {
+    "train": {
+      "loss": 0.29095259308815,
+      "balanced_accuracy": 0.7797770946059728,
+      "macro_f1": 0.7950070195543872,
+      "confusion_matrix": [
+        [
+          6232,
+          94,
+          115,
+          108,
+          67
+        ],
+        [
+          713,
+          248,
+          4,
+          0,
+          0
+        ],
+        [
+          156,
+          3,
+          854,
+          0,
+          0
+        ],
+        [
+          19,
+          0,
+          0,
+          887,
+          0
+        ],
+        [
+          128,
+          0,
+          0,
+          0,
+          920
+        ]
+      ],
+      "class_names": [
+        "Normal Operation",
+        "Valve Destabilization (Repeated Poking)",
+        "Closure Blockage (Bottle Held Open)",
+        "Gear Jam / Transmission Lock",
+        "Added Mechanical Resistance"
+      ]
+    },
+    "val": {
+      "loss": 0.35816723108291626,
+      "balanced_accuracy": 0.7434888514016198,
+      "macro_f1": 0.7527009862124883,
+      "confusion_matrix": [
+        [
+          1336,
+          40,
+          32,
+          27,
+          12
+        ],
+        [
+          168,
+          38,
+          0,
+          0,
+          0
+        ],
+        [
+          31,
+          0,
+          167,
+          0,
+          0
+        ],
+        [
+          8,
+          0,
+          0,
+          164,
+          0
+        ],
+        [
+          43,
+          0,
+          1,
+          0,
+          191
+        ]
+      ],
+      "class_names": [
+        "Normal Operation",
+        "Valve Destabilization (Repeated Poking)",
+        "Closure Blockage (Bottle Held Open)",
+        "Gear Jam / Transmission Lock",
+        "Added Mechanical Resistance"
+      ]
+    },
+    "test": {
+      "loss": 0.33327409625053406,
+      "balanced_accuracy": 0.7608660355080407,
+      "macro_f1": 0.7727968309907072,
+      "confusion_matrix": [
+        [
+          1282,
+          28,
+          31,
+          29,
+          20
+        ],
+        [
+          147,
+          49,
+          0,
+          0,
+          0
+        ],
+        [
+          36,
+          0,
+          147,
+          0,
+          0
+        ],
+        [
+          7,
+          0,
+          0,
+          204,
+          0
+        ],
+        [
+          33,
+          0,
+          0,
+          0,
+          206
+        ]
+      ],
+      "class_names": [
+        "Normal Operation",
+        "Valve Destabilization (Repeated Poking)",
+        "Closure Blockage (Bottle Held Open)",
+        "Gear Jam / Transmission Lock",
+        "Added Mechanical Resistance"
+      ]
+    }
+  },
+  "fit_seconds": 95.00205754197668,
+  "artifact_path": "/Users/paulruiz/Documents/Starthack/starthack26/ml/models/weights/synthetic_benchmark/conv1d_classifier_multiclass.pt"
+}

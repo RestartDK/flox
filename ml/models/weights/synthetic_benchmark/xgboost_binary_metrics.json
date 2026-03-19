@@ -1,0 +1,68 @@
+{
+  "task": "binary",
+  "model_type": "xgboost",
+  "splits": {
+    "train": {
+      "balanced_accuracy": 0.9539233935796079,
+      "f1": 0.946779440468445,
+      "confusion_matrix": [
+        [
+          6501,
+          115
+        ],
+        [
+          294,
+          3638
+        ]
+      ],
+      "roc_auc": 0.9941890386264194,
+      "pr_auc": 0.9908741096261735,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "val": {
+      "balanced_accuracy": 0.8347902075555786,
+      "f1": 0.7928994082840237,
+      "confusion_matrix": [
+        [
+          1340,
+          107
+        ],
+        [
+          208,
+          603
+        ]
+      ],
+      "roc_auc": 0.9275119150382993,
+      "pr_auc": 0.9000722474830116,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "test": {
+      "balanced_accuracy": 0.8345466931641659,
+      "f1": 0.7944862155388471,
+      "confusion_matrix": [
+        [
+          1257,
+          133
+        ],
+        [
+          195,
+          634
+        ]
+      ],
+      "roc_auc": 0.9372963872569013,
+      "pr_auc": 0.9105785080598386,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    }
+  },
+  "fit_seconds": 0.7097718330333009,
+  "artifact_path": "/Users/paulruiz/Documents/Starthack/starthack26/ml/models/weights/synthetic_benchmark/xgboost_binary.pkl"
+}
