@@ -1,0 +1,411 @@
+{
+    "name": "On-Site Engineer Escalation",
+    "conversation_config": {
+        "asr": {
+            "quality": "high",
+            "provider": "elevenlabs",
+            "user_input_audio_format": "ulaw_8000",
+            "keywords": []
+        },
+        "turn": {
+            "turn_timeout": 7,
+            "silence_end_call_timeout": 20,
+            "soft_timeout_config": {
+                "timeout_seconds": -1,
+                "message": "Hhmmmm...yeah.",
+                "use_llm_generated_message": false
+            },
+            "mode": "turn",
+            "turn_eagerness": "normal",
+            "spelling_patience": "auto",
+            "speculative_turn": false,
+            "turn_model": "turn_v2"
+        },
+        "tts": {
+            "model_id": "eleven_flash_v2",
+            "voice_id": "tMvyQtpCVQ0DkixuYm6J",
+            "supported_voices": [],
+            "expressive_mode": false,
+            "suggested_audio_tags": [],
+            "agent_output_audio_format": "ulaw_8000",
+            "optimize_streaming_latency": 3,
+            "stability": 0.5,
+            "speed": 1,
+            "similarity_boost": 0.8,
+            "text_normalisation_type": "system_prompt",
+            "pronunciation_dictionary_locators": []
+        },
+        "conversation": {
+            "text_only": false,
+            "max_duration_seconds": 600,
+            "client_events": [
+                "audio",
+                "interruption"
+            ],
+            "monitoring_enabled": false,
+            "monitoring_events": [
+                "user_transcript",
+                "agent_response",
+                "agent_response_correction"
+            ]
+        },
+        "language_presets": {},
+        "vad": {
+            "background_voice_detection": false
+        },
+        "agent": {
+            "first_message": "Hello, this is the building operations assistant for {{building_name}} calling with an active issue on {{product_name}}. I will give you a short briefing on the situation, the detected failure, the likely cause, and the recommended next step.",
+            "language": "en",
+            "hinglish_mode": false,
+            "dynamic_variables": {
+                "dynamicVariablePlaceholders": {}
+            },
+            "disable_first_message_interruptions": true,
+            "prompt": {
+                "prompt": "You are the automated building operations escalation assistant for {{building_name}}.\n\nYour job is to call the on-site engineer and communicate one active issue using only the variables supplied to you.\n\nDeliver the issue as a cohesive spoken briefing, not as a checklist. Sound like a calm operations lead giving a concise live update. Use short connected sentences with natural transitions so the message feels like one continuous piece of speech.\n\nYou must cover the briefing in this exact order:\n1. Product: identify the affected product as {{product_name}}.\n2. Situation: explain the current operational situation as {{situation_summary}}.\n3. Failure: explain the detected failure as {{failure_name}} and, when useful, add {{failure_summary}}.\n4. Likely cause: explain the likely cause as {{likely_cause}}.\n\nAdditional instructions:\n- State that the affected device is {{device_name}} ({{device_id}}).\n- State the severity as {{severity}} and the detection time as {{detected_at}}.\n- State the recommended action as {{recommended_action}}.\n- Treat the likely cause as provisional, not certain.\n- If {{likely_cause_confidence}} is available, reflect that briefly using plain language.\n- Do not ask the engineer to acknowledge receipt.\n- You may ask for a callback ETA or intervention timing if they can provide one, but do not block the call on that answer.\n- Keep the briefing concise, operational, and easy to follow.\n- Avoid sounding scripted, robotic, or label-driven. Do not say literal section headers like \"Product\", \"Situation\", \"Failure\", or \"Likely cause\" out loud.\n\nRules:\n- Never invent telemetry, root cause, cost, safety claims, or remediation steps beyond the supplied variables.\n- If likely cause is missing or blank, say the likely cause is still under investigation.\n- If asked for unsupported details, say the operations team will follow up with additional information.\n- Do not roleplay, chat casually, or discuss unrelated topics.\n- If the engineer gives an ETA, capture it briefly and close.\n- End the call after delivering the briefing and any short follow-up, or sooner if it is clear they are unavailable to help right now.",
+                "llm": "gpt-5-mini",
+                "temperature": 0,
+                "max_tokens": 220,
+                "tool_ids": [],
+                "built_in_tools": {
+                    "end_call": {
+                        "type": "system",
+                        "name": "end_call",
+                        "description": "Gracefully conclude conversations when appropriate\nCall this function when:\n1. EXPLICIT ENDINGS\n- User says goodbye variants: \"bye,\" \"see you,\" \"that's all,\" etc.\n- User directly declines help: \"no thanks,\" \"I'm good,\" etc.\n- User indicates completion: \"that's what I needed,\" \"all set,\" etc.\n\n2. IMPLICIT ENDINGS\n- User gives minimal/disengaged responses after their needs are met\n- User expresses intention to leave: \"I need to go,\" \"getting late,\" etc.\n- Natural conversation conclusion after all queries are resolved\n\nBefore calling this function:\n1. Confirm all user queries are fully addressed\n2. Provide a contextually appropriate closing response:\n- For task completion: \"Glad I could help with [specific task]! Have a great day!\"\n- For general endings: \"Thanks for chatting! Take care!\"\n- For business contexts: \"Thank you for your business! Don't hesitate to reach out again.\"\n\nDO NOT:\n- Call this function during active problem-solving\n- End conversation when user expresses new concerns\n- Use generic closings without acknowledging the specific interaction\n- Continue conversation after user has clearly indicated ending\n- Add \"Let me know if you need anything else\" after user says goodbye\n\nExample Flow:\nUser: \"That's all I needed, thanks!\"\nAssistant: \"Happy I could help with your password reset! Have a wonderful day!\"\n[end_call function called]",
+                        "response_timeout_secs": 20,
+                        "disable_interruptions": false,
+                        "force_pre_tool_speech": false,
+                        "assignments": [],
+                        "tool_call_sound_behavior": "auto",
+                        "tool_error_handling_mode": "auto",
+                        "params": {
+                            "system_tool_type": "end_call"
+                        }
+                    },
+                    "voicemail_detection": {
+                        "type": "system",
+                        "name": "voicemail_detection",
+                        "description": "Detect when a call has been answered by a voicemail system rather than a human.\nCall this function when you detect that the call recipient is not available and the call has been answered by an automated voicemail system.\n\nCommon indicators of voicemail:\n- Automated greeting messages: \"You have reached the voicemail of...\"\n- Recording instructions: \"Please leave a message after the beep/tone\"\n- Voicemail system prompts: \"Please leave your name and number\"\n- Generic unavailable messages: \"The number you have dialed is not available\"\n\nBefore calling this function:\n- Provide a specific reason referencing the actual voicemail content heard\n\nAfter calling this function:\n- If a voicemail message is configured, it will be played automatically\n- The call will end immediately after the message (or immediately if no message)\n- No further conversation will take place\n\nYou must provide a specific reason for detecting voicemail that references the exact wording that indicated voicemail.\n\nEXAMPLE FLOWS:\n\nExample 1 (clear voicemail greeting):\nSystem plays: \"Hi, you've reached Sarah. I'm not available right now. Please leave a message after the beep.\"\nAssistant: [voicemail_detection function called with reason=\"automated greeting detected: 'Hi, you've reached Sarah. I'm not available right now. Please leave a message after the beep.'\"]\n\nExample 2 (generic voicemail):\nSystem plays: \"The number you have dialed is not available. At the tone, please leave a message.\"\nAssistant: [voicemail_detection function called with reason=\"voicemail instruction detected: 'The number you have dialed is not available. At the tone, please leave a message.'\"]\n\nExample 3 (DO NOT call - human response):\nHuman: \"Hello? Who is this?\"\nAssistant: [follows system prompt and conversation objectives rather than calling voicemail_detection]\n\nYou must provide a specific reason for detecting voicemail. Never call this tool without a valid reason.\nThe reason must include a specific reference to the wording in the user message that indicates voicemail.",
+                        "response_timeout_secs": 20,
+                        "disable_interruptions": false,
+                        "force_pre_tool_speech": false,
+                        "assignments": [],
+                        "tool_call_sound_behavior": "auto",
+                        "tool_error_handling_mode": "auto",
+                        "params": {
+                            "system_tool_type": "voicemail_detection",
+                            "voicemail_message": ""
+                        }
+                    },
+                    "memory_entry_search": null,
+                    "memory_entry_create": null,
+                    "memory_entry_update": null,
+                    "memory_entry_delete": null,
+                    "agent_prompt_change": null
+                },
+                "enable_parallel_tool_calls": false,
+                "mcp_server_ids": [],
+                "native_mcp_server_ids": [],
+                "knowledge_base": [
+                    {
+                        "type": "file",
+                        "name": "Belimo Product Range",
+                        "id": "hpme2NGsqYiUmFp2NlRd",
+                        "usage_mode": "auto"
+                    }
+                ],
+                "ignore_default_personality": false,
+                "rag": {
+                    "enabled": true,
+                    "embedding_model": "e5_mistral_7b_instruct",
+                    "max_vector_distance": 0.4,
+                    "max_documents_length": 20000,
+                    "max_retrieved_rag_chunks_count": 15,
+                    "num_candidates": null
+                },
+                "timezone": "Europe/Zurich",
+                "backup_llm_config": {
+                    "preference": "default"
+                },
+                "cascade_timeout_seconds": 8,
+                "tools": [
+                    {
+                        "type": "system",
+                        "name": "end_call",
+                        "description": "Gracefully conclude conversations when appropriate\nCall this function when:\n1. EXPLICIT ENDINGS\n- User says goodbye variants: \"bye,\" \"see you,\" \"that's all,\" etc.\n- User directly declines help: \"no thanks,\" \"I'm good,\" etc.\n- User indicates completion: \"that's what I needed,\" \"all set,\" etc.\n\n2. IMPLICIT ENDINGS\n- User gives minimal/disengaged responses after their needs are met\n- User expresses intention to leave: \"I need to go,\" \"getting late,\" etc.\n- Natural conversation conclusion after all queries are resolved\n\nBefore calling this function:\n1. Confirm all user queries are fully addressed\n2. Provide a contextually appropriate closing response:\n- For task completion: \"Glad I could help with [specific task]! Have a great day!\"\n- For general endings: \"Thanks for chatting! Take care!\"\n- For business contexts: \"Thank you for your business! Don't hesitate to reach out again.\"\n\nDO NOT:\n- Call this function during active problem-solving\n- End conversation when user expresses new concerns\n- Use generic closings without acknowledging the specific interaction\n- Continue conversation after user has clearly indicated ending\n- Add \"Let me know if you need anything else\" after user says goodbye\n\nExample Flow:\nUser: \"That's all I needed, thanks!\"\nAssistant: \"Happy I could help with your password reset! Have a wonderful day!\"\n[end_call function called]",
+                        "response_timeout_secs": 20,
+                        "disable_interruptions": false,
+                        "force_pre_tool_speech": false,
+                        "assignments": [],
+                        "tool_call_sound_behavior": "auto",
+                        "tool_error_handling_mode": "auto",
+                        "params": {
+                            "system_tool_type": "end_call"
+                        }
+                    },
+                    {
+                        "type": "system",
+                        "name": "voicemail_detection",
+                        "description": "Detect when a call has been answered by a voicemail system rather than a human.\nCall this function when you detect that the call recipient is not available and the call has been answered by an automated voicemail system.\n\nCommon indicators of voicemail:\n- Automated greeting messages: \"You have reached the voicemail of...\"\n- Recording instructions: \"Please leave a message after the beep/tone\"\n- Voicemail system prompts: \"Please leave your name and number\"\n- Generic unavailable messages: \"The number you have dialed is not available\"\n\nBefore calling this function:\n- Provide a specific reason referencing the actual voicemail content heard\n\nAfter calling this function:\n- If a voicemail message is configured, it will be played automatically\n- The call will end immediately after the message (or immediately if no message)\n- No further conversation will take place\n\nYou must provide a specific reason for detecting voicemail that references the exact wording that indicated voicemail.\n\nEXAMPLE FLOWS:\n\nExample 1 (clear voicemail greeting):\nSystem plays: \"Hi, you've reached Sarah. I'm not available right now. Please leave a message after the beep.\"\nAssistant: [voicemail_detection function called with reason=\"automated greeting detected: 'Hi, you've reached Sarah. I'm not available right now. Please leave a message after the beep.'\"]\n\nExample 2 (generic voicemail):\nSystem plays: \"The number you have dialed is not available. At the tone, please leave a message.\"\nAssistant: [voicemail_detection function called with reason=\"voicemail instruction detected: 'The number you have dialed is not available. At the tone, please leave a message.'\"]\n\nExample 3 (DO NOT call - human response):\nHuman: \"Hello? Who is this?\"\nAssistant: [follows system prompt and conversation objectives rather than calling voicemail_detection]\n\nYou must provide a specific reason for detecting voicemail. Never call this tool without a valid reason.\nThe reason must include a specific reference to the wording in the user message that indicates voicemail.",
+                        "response_timeout_secs": 20,
+                        "disable_interruptions": false,
+                        "force_pre_tool_speech": false,
+                        "assignments": [],
+                        "tool_call_sound_behavior": "auto",
+                        "tool_error_handling_mode": "auto",
+                        "params": {
+                            "system_tool_type": "voicemail_detection",
+                            "voicemail_message": ""
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "platform_settings": {
+        "evaluation": {
+            "criteria": []
+        },
+        "widget": {
+            "variant": "full",
+            "placement": "bottom-right",
+            "expandable": "never",
+            "avatar": {
+                "type": "orb",
+                "color1": "#2792dc",
+                "color2": "#9ce6e6"
+            },
+            "feedback_mode": "none",
+            "end_feedback": {
+                "type": "rating"
+            },
+            "bg_color": "#ffffff",
+            "text_color": "#000000",
+            "btn_color": "#000000",
+            "btn_text_color": "#ffffff",
+            "border_color": "#e1e1e1",
+            "focus_color": "#000000",
+            "shareable_page_show_terms": true,
+            "show_avatar_when_collapsed": false,
+            "disable_banner": false,
+            "markdown_link_allowed_hosts": [],
+            "markdown_link_include_www": true,
+            "markdown_link_allow_http": true,
+            "mic_muting_enabled": false,
+            "transcript_enabled": false,
+            "text_input_enabled": false,
+            "conversation_mode_toggle_enabled": false,
+            "default_expanded": false,
+            "always_expanded": false,
+            "dismissible": false,
+            "show_agent_status": false,
+            "show_conversation_id": true,
+            "strip_audio_tags": true,
+            "syntax_highlight_theme": null,
+            "text_contents": {
+                "send_message": null,
+                "text_mode": null,
+                "voice_mode": null,
+                "switched_to_text_mode": null,
+                "switched_to_voice_mode": null,
+                "copy": null,
+                "download": null,
+                "wrap": null,
+                "agent_working": null,
+                "agent_done": null,
+                "agent_error": null
+            },
+            "styles": {},
+            "language_selector": false,
+            "supports_text_only": false,
+            "language_presets": {}
+        },
+        "data_collection": {},
+        "overrides": {
+            "conversation_config_override": {
+                "turn": {
+                    "soft_timeout_config": {
+                        "message": false
+                    }
+                },
+                "tts": {
+                    "voice_id": false,
+                    "stability": false,
+                    "speed": false,
+                    "similarity_boost": false
+                },
+                "conversation": {
+                    "text_only": true
+                },
+                "agent": {
+                    "first_message": false,
+                    "language": false,
+                    "prompt": {
+                        "prompt": false,
+                        "llm": false,
+                        "native_mcp_server_ids": false
+                    }
+                }
+            },
+            "custom_llm_extra_body": false,
+            "enable_conversation_initiation_client_data_from_webhook": false
+        },
+        "workspace_overrides": {
+            "webhooks": {
+                "events": [
+                    "transcript"
+                ],
+                "send_audio": false
+            }
+        },
+        "testing": {
+            "attached_tests": [],
+            "referenced_tests_ids": []
+        },
+        "archived": false,
+        "guardrails": {
+            "version": "1",
+            "focus": {
+                "is_enabled": false
+            },
+            "prompt_injection": {
+                "is_enabled": false
+            },
+            "content": {
+                "execution_mode": "streaming",
+                "config": {
+                    "sexual": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "violence": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "harassment": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "self_harm": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "profanity": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "religion_or_politics": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    },
+                    "medical_and_legal_information": {
+                        "is_enabled": false,
+                        "threshold": "medium"
+                    }
+                }
+            },
+            "moderation": {
+                "execution_mode": "streaming",
+                "config": {
+                    "sexual": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "violence": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "violence_graphic": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "harassment": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "harassment_threatening": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "hate": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "hate_threatening": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "self_harm_instructions": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "self_harm": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "self_harm_intent": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    },
+                    "sexual_minors": {
+                        "is_enabled": false,
+                        "threshold": 0.3
+                    }
+                }
+            },
+            "custom": {
+                "config": {
+                    "configs": []
+                }
+            }
+        },
+        "summary_language": null,
+        "auth": {
+            "enable_auth": false,
+            "allowlist": [],
+            "require_origin_header": false
+        },
+        "call_limits": {
+            "agent_concurrency_limit": -1,
+            "daily_limit": 100000,
+            "bursting_enabled": true
+        },
+        "ban": null,
+        "privacy": {
+            "record_voice": true,
+            "retention_days": -1,
+            "delete_transcript_and_pii": false,
+            "delete_audio": false,
+            "apply_to_existing_conversations": false,
+            "zero_retention_mode": false,
+            "conversation_history_redaction": {
+                "enabled": false,
+                "entities": []
+            }
+        },
+        "safety": {
+            "is_blocked_ivc": false,
+            "is_blocked_non_ivc": false,
+            "ignore_safety_evaluation": false
+        }
+    },
+    "tags": [
+        "ops",
+        "on-site-engineer",
+        "twilio-ready"
+    ],
+    "workflow": {
+        "edges": {},
+        "nodes": {
+            "start_node": {
+                "type": "start",
+                "position": {
+                    "x": 0,
+                    "y": 0
+                },
+                "edge_order": []
+            }
+        },
+        "prevent_subagent_loops": false
+    }
+}

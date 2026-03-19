@@ -24,8 +24,9 @@ export const useAgentChat = () => {
   return useMutation({
     mutationFn: postAgentChat,
     onSuccess: (result) => {
+      const MUTATING_TOOLS = new Set(['resolve_fault', 'escalate_fault']);
       const hasStateMutation = result.toolEvents.some(
-        (event) => event.outcome === 'executed' && event.name === 'resolve_fault',
+        (event) => event.outcome === 'executed' && MUTATING_TOOLS.has(event.name),
       );
 
       if (hasStateMutation) {

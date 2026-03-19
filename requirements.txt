@@ -29,6 +29,7 @@ streamlit
 
 # AI / Agent SDK
 anthropic
+elevenlabs>=2.39.0
 
 # ML (heavy - comment out if not needed)
 # torch
