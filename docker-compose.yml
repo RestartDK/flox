@@ -52,9 +52,9 @@ services:
     ports:
       - "8200:8000"
     environment:
-      - ML_LATEST_WEIGHTS_PATH=/app/ml/models/weights
+      - ML_LATEST_WEIGHTS_PATH=${ML_LATEST_WEIGHTS_PATH:-}
       - ML_MODEL_FILE=${ML_MODEL_FILE:-}
-      - PYTHONPATH=/app
+      - PYTHONPATH=${PYTHONPATH:-/app}
     volumes:
       - ./ml/models:/app/ml/models
       - ./.env:/app/.env

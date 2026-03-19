@@ -151,10 +151,10 @@ class PredictionResponse(BaseModel):
     is_anomaly: bool | None = None
 
 
-weights_path = os.getenv("ML_LATEST_WEIGHTS_PATH")
-if weights_path is None:
-    raise RuntimeError("ML_LATEST_WEIGHTS_PATH not set")
+# Default weights path relative to the inference.py file location
+DEFAULT_WEIGHTS_PATH = str(Path(__file__).parent / "models" / "weights")
 
+weights_path = os.getenv("ML_LATEST_WEIGHTS_PATH", DEFAULT_WEIGHTS_PATH)
 model_file = os.getenv("ML_MODEL_FILE")
 
 checkpoint_path: Path | None = None

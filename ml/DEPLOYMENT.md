@@ -86,9 +86,11 @@ Pre-trained benchmark models in `ml/models/weights/synthetic_benchmark/`:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ML_LATEST_WEIGHTS_PATH` | Yes | `/app/ml/models/weights` | Directory to search for model weights |
+| `ML_LATEST_WEIGHTS_PATH` | No | `{inference.py dir}/models/weights` | Directory to search for model weights |
 | `ML_MODEL_FILE` | No | - | Specific model file to load (overrides auto-discovery) |
-| `PYTHONPATH` | Yes | `/app` | Python path for imports |
+| `PYTHONPATH` | No | `/app` | Python path for imports |
+
+**Note**: If `ML_LATEST_WEIGHTS_PATH` is not set, the service defaults to `models/weights` relative to the `inference.py` file location. This ensures the service works out-of-the-box in most deployment scenarios.
 
 ## Troubleshooting
 
