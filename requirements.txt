@@ -14,6 +14,7 @@ flask-cors
 uvicorn[standard]
 pydantic
 psycopg[binary]
+python-multipart
 
 # Worker (Celery + Redis)
 celery[redis]
