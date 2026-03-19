@@ -2,17 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 import {
   type FacilityStatusResponse,
 } from '@/data/mockDevices';
-
-const DEFAULT_PRODUCTION_BACKEND_URL = 'https://starthack26-backend-production.up.railway.app';
+import { resolveBackendBaseUrl } from '@/lib/backendConfig';
 
 const getStatusUrl = () => {
-  const baseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
+  const baseUrl = resolveBackendBaseUrl({
+    explicitUrl: import.meta.env.VITE_BACKEND_URL,
+    isProduction: import.meta.env.PROD,
+  });
   if (baseUrl) {
     return `${baseUrl}/api/status`;
-  }
-
-  if (import.meta.env.PROD) {
-    return `${DEFAULT_PRODUCTION_BACKEND_URL}/api/status`;
   }
 
   return '/api/status';
