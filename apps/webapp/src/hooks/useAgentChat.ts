@@ -25,7 +25,7 @@ export const useAgentChat = () => {
     mutationFn: postAgentChat,
     onSuccess: (result) => {
       const hasStateMutation = result.toolEvents.some(
-        (event) => event.outcome === 'executed' && ['resolve_fault', 'run_diagnosis_cycle_now'].includes(event.name),
+        (event) => event.outcome === 'executed' && event.name === 'resolve_fault',
       );
 
       if (hasStateMutation) {

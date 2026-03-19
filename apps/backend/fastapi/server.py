@@ -2,7 +2,7 @@ import os
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas import (
@@ -12,6 +12,7 @@ from schemas import (
     IngestResponse,
     MlFailureModeRequest,
     MlFailureModeResponse,
+    NodeFaultHistoryResponse,
     ResolveFaultRequest,
     ResolveFaultResponse,
     StatusResponse,
@@ -20,6 +21,7 @@ from shacklib.backend_state import ensure_storage_ready, read_state, update_stat
 from shacklib.codex_agent import run_codex_agent_chat
 from shacklib.diagnosis_engine import (
     build_status_payload,
+    build_node_fault_history_payload,
     ingest_node,
     resolve_fault,
     seed_mock_state_if_empty,
@@ -93,6 +95,21 @@ async def resolve(fault_id: str, payload: ResolveFaultRequest) -> ResolveFaultRe
         return update_state(_mutator)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="fault not found") from exc
+
+
+@app.get("/api/nodes/{node_id}/fault-history", response_model=NodeFaultHistoryResponse)
+async def node_fault_history(
+    node_id: str,
+    limit: int = Query(default=25, ge=1, le=100),
+) -> NodeFaultHistoryResponse:
+    state = read_state()
+    nodes = state.get("nodes") if isinstance(state.get("nodes"), dict) else {}
+
+    if node_id not in nodes:
+        raise HTTPException(status_code=404, detail="node not found")
+
+    payload = build_node_fault_history_payload(state, node_id=node_id, limit=limit)
+    return NodeFaultHistoryResponse.model_validate(payload)
 
 
 @app.post("/api/ml/failure-mode", response_model=MlFailureModeResponse)

@@ -429,6 +429,56 @@ def resolve_fault(
     }
 
 
+def build_node_fault_history_payload(
+    state: dict[str, Any],
+    node_id: str,
+    limit: int = 25,
+) -> dict[str, Any]:
+    nodes: dict[str, dict[str, Any]] = state.get("nodes") or {}
+    faults: dict[str, dict[str, Any]] = state.get("faults") or {}
+
+    history: list[dict[str, Any]] = []
+    for fault in faults.values():
+        if not isinstance(fault, dict):
+            continue
+        if str(fault.get("nodeId") or "") != node_id:
+            continue
+
+        history.append(
+            {
+                "id": str(fault.get("id") or ""),
+                "state": str(fault.get("state") or "resolved"),
+                "kind": str(fault.get("kind") or "unknown"),
+                "probability": round(float(fault.get("probability") or 0.0), 2),
+                "summary": str(fault.get("summary") or ""),
+                "recommendedAction": str(fault.get("recommendedAction") or ""),
+                "openedAt": str(fault.get("openedAt") or utc_now_iso()),
+                "updatedAt": str(fault.get("updatedAt") or utc_now_iso()),
+                "resolvedBy": fault.get("resolvedBy"),
+                "note": fault.get("note"),
+            }
+        )
+
+    history.sort(
+        key=lambda item: str(item.get("updatedAt") or item.get("openedAt") or ""),
+        reverse=True,
+    )
+
+    node = nodes.get(node_id)
+    node_label = (
+        node.get("label") if isinstance(node, dict) else _label_from_node_id(node_id)
+    )
+
+    clamped_limit = max(1, min(int(limit), 100))
+    return {
+        "nodeId": node_id,
+        "nodeLabel": node_label,
+        "totalFaults": len(history),
+        "openFaults": sum(1 for item in history if item.get("state") == "open"),
+        "faultHistory": history[:clamped_limit],
+    }
+
+
 def _history_series(node: dict[str, Any], key: str) -> list[dict[str, Any]]:
     history_by_variable = node.get("historyByVariable") or {}
     series = history_by_variable.get(key) or []

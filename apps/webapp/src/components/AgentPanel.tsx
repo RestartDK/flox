@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, Loader2, Send, ShieldAlert, X } from 'lucide-react';
+import { Activity, Bot, Check, Clock3, Loader2, Send, ShieldAlert, Wrench, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { type AgentChatMessage, type AgentToolEvent, type AgentPendingAction, type Device } from '@/data/mockDevices';
 import { useAgentChat } from '@/hooks/useAgentChat';
+import { useNodeFaultHistory } from '@/hooks/useNodeFaultHistory';
 
 interface AgentPanelProps {
   devices: Device[];
@@ -21,6 +22,14 @@ interface MentionContext {
   query: string;
 }
 
+interface ChatActionButton {
+  key: string;
+  label: string;
+  prompt?: string;
+  nodeId?: string;
+  style?: 'neutral' | 'primary' | 'danger';
+}
+
 const severityWeight: Record<string, number> = {
   critical: 0,
   high: 1,
@@ -35,6 +44,26 @@ const toPayloadMessages = (messages: ConversationMessage[]): AgentChatMessage[] 
   }));
 
 const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const NODE_ID_PATTERN = /\b[A-Z]{3}-[A-Z]{3}-\d{3}\b/g;
+const FAULT_ID_PATTERN = /\bfault-[a-z0-9-]+\b/gi;
+
+const titleCase = (value: string) => value
+  .split('_')
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
+const formatTimestamp = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 const MessageMarkdown = ({ content }: { content: string }) => (
   <ReactMarkdown
@@ -86,6 +115,7 @@ const extractMentionContext = (value: string, caretPosition: number): MentionCon
 export default function AgentPanel({ devices }: AgentPanelProps) {
   const agentChat = useAgentChat();
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<ConversationMessage[]>([
     {
@@ -98,6 +128,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   const [input, setInput] = useState('');
   const [caretPosition, setCaretPosition] = useState(0);
   const [mentionCursor, setMentionCursor] = useState(0);
+  const [historyNodeId, setHistoryNodeId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<AgentPendingAction | null>(null);
   const [latestToolEvents, setLatestToolEvents] = useState<AgentToolEvent[]>([]);
 
@@ -112,6 +143,35 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
       .sort((a, b) => severityWeight[a.fault.severity] - severityWeight[b.fault.severity]);
     return faultEntries[0] ?? null;
   }, [devices]);
+
+  const nodeSuggestions = useMemo(() => {
+    const unique = new Map<string, { id: string; name: string; status: Device['status'] }>();
+    for (const device of devices) {
+      unique.set(device.id, {
+        id: device.id,
+        name: device.name,
+        status: device.status,
+      });
+    }
+    return Array.from(unique.values()).sort((a, b) => a.id.localeCompare(b.id));
+  }, [devices]);
+
+  useEffect(() => {
+    if (historyNodeId) {
+      return;
+    }
+
+    if (topFault?.device.id) {
+      setHistoryNodeId(topFault.device.id);
+      return;
+    }
+
+    if (nodeSuggestions[0]?.id) {
+      setHistoryNodeId(nodeSuggestions[0].id);
+    }
+  }, [historyNodeId, nodeSuggestions, topFault]);
+
+  const nodeFaultHistoryQuery = useNodeFaultHistory(historyNodeId, 30);
 
   const quickPrompts = useMemo(() => {
     const prompts = ['Give me a live system overview and top active faults.'];
@@ -130,18 +190,6 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
     () => extractMentionContext(input, caretPosition),
     [input, caretPosition],
   );
-
-  const nodeSuggestions = useMemo(() => {
-    const unique = new Map<string, { id: string; name: string; status: Device['status'] }>();
-    for (const device of devices) {
-      unique.set(device.id, {
-        id: device.id,
-        name: device.name,
-        status: device.status,
-      });
-    }
-    return Array.from(unique.values()).sort((a, b) => a.id.localeCompare(b.id));
-  }, [devices]);
 
   const mentionSuggestions = useMemo(() => {
     if (!mentionContext) {
@@ -173,6 +221,76 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   useEffect(() => {
     setMentionCursor(0);
   }, [mentionContext?.start, mentionContext?.query]);
+
+  useEffect(() => {
+    if (!chatScrollRef.current) {
+      return;
+    }
+
+    const container = chatScrollRef.current;
+    requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
+  }, [messages, agentChat.isPending, pendingAction?.id]);
+
+  const knownNodeIds = useMemo(
+    () => new Set(nodeSuggestions.map((node) => node.id)),
+    [nodeSuggestions],
+  );
+
+  const buildMessageActions = (content: string): ChatActionButton[] => {
+    const nodeMatches = Array.from(new Set((content.match(NODE_ID_PATTERN) ?? []).filter((id) => knownNodeIds.has(id))));
+    const faultMatches = Array.from(new Set((content.match(FAULT_ID_PATTERN) ?? []).map((id) => id.toLowerCase())));
+
+    const actions: ChatActionButton[] = [];
+
+    for (const nodeId of nodeMatches.slice(0, 1)) {
+      actions.push({
+        key: `focus-${nodeId}`,
+        label: `View ${nodeId} timeline`,
+        nodeId,
+        style: 'neutral',
+      });
+      actions.push({
+        key: `diagnose-${nodeId}`,
+        label: `Run diagnosis ${nodeId}`,
+        prompt: `Run node diagnosis for ${nodeId} now and summarize likely root cause.`,
+        nodeId,
+        style: 'primary',
+      });
+      actions.push({
+        key: `history-${nodeId}`,
+        label: `History ${nodeId}`,
+        prompt: `Show fault history for node ${nodeId}.`,
+        nodeId,
+        style: 'neutral',
+      });
+    }
+
+    for (const faultId of faultMatches.slice(0, 1)) {
+      actions.push({
+        key: `resolve-${faultId}`,
+        label: `Resolve ${faultId}`,
+        prompt: `Resolve fault ${faultId} with note "resolved from inline chat action".`,
+        style: 'danger',
+      });
+    }
+
+    return actions;
+  };
+
+  const runMessageAction = (action: ChatActionButton) => {
+    if (action.nodeId) {
+      setHistoryNodeId(action.nodeId);
+    }
+
+    if (action.prompt) {
+      sendPrompt(action.prompt);
+    }
+  };
 
   const applyMention = (nodeId: string) => {
     if (!mentionContext) {
@@ -311,12 +429,84 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
         ))}
       </div>
 
-      <div className="flex-1 min-h-0 border border-border bg-card p-4 overflow-y-auto space-y-3">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      <div className="mb-4 border border-border bg-card p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="label-caps">Node Fault History</div>
+            <div className="text-[12px] text-muted-foreground">
+              Timeline of all open and resolved incidents for one node.
+            </div>
+          </div>
+          <select
+            value={historyNodeId ?? ''}
+            onChange={(event) => setHistoryNodeId(event.target.value || null)}
+            className="h-8 min-w-[200px] border border-border bg-background px-2 text-[12px] outline-none"
           >
+            {nodeSuggestions.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.id} - {node.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mt-3 max-h-44 overflow-y-auto space-y-2 pr-1">
+          {nodeFaultHistoryQuery.isLoading && (
+            <div className="inline-flex items-center gap-2 text-[12px] text-muted-foreground">
+              <Loader2 size={12} className="animate-spin" />
+              Loading history...
+            </div>
+          )}
+
+          {nodeFaultHistoryQuery.error instanceof Error && (
+            <div className="text-[12px] text-status-fault">
+              Could not load node history ({nodeFaultHistoryQuery.error.message})
+            </div>
+          )}
+
+          {nodeFaultHistoryQuery.data?.faultHistory.length === 0 && (
+            <div className="text-[12px] text-muted-foreground">
+              No incidents recorded for this node yet.
+            </div>
+          )}
+
+          {nodeFaultHistoryQuery.data?.faultHistory.map((fault) => (
+            <div key={fault.id} className="border border-border bg-background p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[12px] font-medium text-foreground">{titleCase(fault.kind)}</div>
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${
+                    fault.state === 'open'
+                      ? 'bg-status-fault/15 text-status-fault'
+                      : 'bg-status-healthy/15 text-status-healthy'
+                  }`}
+                >
+                  {fault.state}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <Activity size={11} />
+                  Confidence {(fault.probability * 100).toFixed(0)}%
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Clock3 size={11} />
+                  {formatTimestamp(fault.openedAt)}
+                </span>
+              </div>
+              <div className="mt-1 text-[12px] text-foreground/90">{fault.summary}</div>
+              <div className="mt-1 text-[11px] text-muted-foreground inline-flex items-start gap-1">
+                <Wrench size={11} className="mt-0.5 shrink-0" />
+                {fault.recommendedAction}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div ref={chatScrollRef} className="flex-1 min-h-0 border border-border bg-card p-4 overflow-y-auto space-y-3">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`w-fit max-w-[78%] rounded-md px-3 py-2 text-[13px] ${
                 message.role === 'user'
@@ -329,6 +519,28 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
                 {message.role}
               </div>
               <MessageMarkdown content={message.content} />
+
+              {message.role === 'assistant' && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {buildMessageActions(message.content).map((action) => (
+                    <button
+                      key={`${message.id}-${action.key}`}
+                      type="button"
+                      disabled={agentChat.isPending}
+                      onClick={() => runMessageAction(action)}
+                      className={`border px-2 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                        action.style === 'primary'
+                          ? 'border-foreground/30 bg-foreground/5 text-foreground hover:border-foreground/60'
+                          : action.style === 'danger'
+                            ? 'border-status-fault/40 bg-status-fault/10 text-status-fault hover:border-status-fault/70'
+                            : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}

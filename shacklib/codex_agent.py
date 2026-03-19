@@ -9,6 +9,7 @@ import requests
 
 from shacklib.backend_state import read_state, update_state
 from shacklib.diagnosis_engine import (
+    build_node_fault_history_payload,
     build_status_payload,
     resolve_fault,
     utc_now_iso,
@@ -384,40 +385,14 @@ def _tool_get_node_details(node_id: str) -> dict[str, Any]:
 
 def _tool_get_node_fault_history(node_id: str, limit: int) -> dict[str, Any]:
     def _mutator(state: dict[str, Any]) -> dict[str, Any]:
-        faults = state.get("faults") if isinstance(state.get("faults"), dict) else {}
-        history: list[dict[str, Any]] = []
+        nodes = state.get("nodes") if isinstance(state.get("nodes"), dict) else {}
+        if node_id not in nodes:
+            return {
+                "error": "node not found",
+                "nodeId": node_id,
+            }
 
-        for fault in faults.values():
-            if not isinstance(fault, dict):
-                continue
-            if str(fault.get("nodeId") or "") != node_id:
-                continue
-            history.append(
-                {
-                    "id": fault.get("id"),
-                    "state": fault.get("state"),
-                    "kind": fault.get("kind"),
-                    "probability": float(fault.get("probability") or 0.0),
-                    "summary": fault.get("summary"),
-                    "recommendedAction": fault.get("recommendedAction"),
-                    "openedAt": fault.get("openedAt"),
-                    "updatedAt": fault.get("updatedAt"),
-                    "resolvedBy": fault.get("resolvedBy"),
-                    "note": fault.get("note"),
-                }
-            )
-
-        history.sort(
-            key=lambda item: str(item.get("openedAt") or item.get("updatedAt") or ""),
-            reverse=True,
-        )
-
-        return {
-            "nodeId": node_id,
-            "totalFaults": len(history),
-            "openFaults": sum(1 for item in history if item.get("state") == "open"),
-            "faultHistory": history[:limit],
-        }
+        return build_node_fault_history_payload(state, node_id=node_id, limit=limit)
 
     return update_state(_mutator)
 

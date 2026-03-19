@@ -180,6 +180,27 @@ export interface AgentChatResponse {
   pendingAction: AgentPendingAction | null;
 }
 
+export interface NodeFaultHistoryEntry {
+  id: string;
+  state: 'open' | 'resolved';
+  kind: string;
+  probability: number;
+  summary: string;
+  recommendedAction: string;
+  openedAt: string;
+  updatedAt: string;
+  resolvedBy: string | null;
+  note: string | null;
+}
+
+export interface NodeFaultHistoryResponse {
+  nodeId: string;
+  nodeLabel: string;
+  totalFaults: number;
+  openFaults: number;
+  faultHistory: NodeFaultHistoryEntry[];
+}
+
 const generateTelemetry = (base: number, variance: number, anomaly = false): TelemetryPoint[] => {
   return Array.from({ length: 24 }, (_, i) => ({
     time: `${String(i).padStart(2, '0')}:00`,

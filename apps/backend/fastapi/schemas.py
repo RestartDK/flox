@@ -174,6 +174,27 @@ class ResolveFaultResponse(BaseModel):
     state: FaultState
 
 
+class NodeFaultHistoryEntry(BaseModel):
+    id: str
+    state: FaultState
+    kind: str
+    probability: float
+    summary: str
+    recommendedAction: str
+    openedAt: str
+    updatedAt: str
+    resolvedBy: str | None = None
+    note: str | None = None
+
+
+class NodeFaultHistoryResponse(BaseModel):
+    nodeId: str
+    nodeLabel: str
+    totalFaults: int
+    openFaults: int
+    faultHistory: list[NodeFaultHistoryEntry]
+
+
 class MlFailureModeRequest(BaseModel):
     nodeId: str = Field(min_length=1)
     timeoutSeconds: float | None = Field(default=None, ge=0.2, le=30.0)
