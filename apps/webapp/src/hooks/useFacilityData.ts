@@ -2,8 +2,31 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FacilityStatusResponse } from '@/types/facility';
 import { buildBackendUrl } from '@/lib/backend';
 
+const BACKEND_TIMEOUT_MS = 8000;
+
+const fetchWithTimeout = async (input: string, init?: RequestInit) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`Backend request timed out after ${BACKEND_TIMEOUT_MS / 1000}s: ${input}`);
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 const fetchFacilityStatus = async (): Promise<FacilityStatusResponse> => {
-  const response = await fetch(buildBackendUrl('/api/status'), {
+  const url = buildBackendUrl('/api/status');
+  const response = await fetchWithTimeout(url, {
     cache: 'no-store',
   });
 
@@ -42,7 +65,7 @@ export const useResolveFault = () => {
 
   const mutation = useMutation({
     mutationFn: (faultId: string) =>
-      fetch(buildBackendUrl(`/api/faults/${encodeURIComponent(faultId)}/resolve`), {
+      fetchWithTimeout(buildBackendUrl(`/api/faults/${encodeURIComponent(faultId)}/resolve`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resolvedBy: 'operator' }),
