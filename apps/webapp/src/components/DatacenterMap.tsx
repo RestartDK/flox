@@ -132,7 +132,7 @@ const rowOverlays: Array<{ id: RowId; label: string; x: number; y: number; width
   { id: 'row_f', label: 'ROW F', x: 896, y: 214, width: 108, height: 280 },
 ];
 
-const baselineRowTemperatures: Record<RowId, number> = {
+const defaultBaselineRowTemperatures: Record<RowId, number> = {
   row_a: 22.4,
   row_b: 31.6,
   row_c: 22.6,
@@ -157,12 +157,12 @@ const buildRowTemperatures = (progress: number): Record<RowId, number> => {
   const pulse = Math.sin(progress * Math.PI * 8) * (1 - settle) * 0.2;
 
   return {
-    row_a: baselineRowTemperatures.row_a + 0.8 * surge,
-    row_b: baselineRowTemperatures.row_b + 2.3 * surge + 0.7 * settle,
-    row_c: baselineRowTemperatures.row_c + 0.9 * surge,
-    row_d: baselineRowTemperatures.row_d + 2.6 * surge + 0.9 * settle,
-    row_e: baselineRowTemperatures.row_e + 6.0 * surge + 1.1 * settle + pulse,
-    row_f: baselineRowTemperatures.row_f + 11.8 * surge + 2.3 * settle + 1.5 * pulse,
+    row_a: defaultBaselineRowTemperatures.row_a + 0.8 * surge,
+    row_b: defaultBaselineRowTemperatures.row_b + 2.3 * surge + 0.7 * settle,
+    row_c: defaultBaselineRowTemperatures.row_c + 0.9 * surge,
+    row_d: defaultBaselineRowTemperatures.row_d + 2.6 * surge + 0.9 * settle,
+    row_e: defaultBaselineRowTemperatures.row_e + 6.0 * surge + 1.1 * settle + pulse,
+    row_f: defaultBaselineRowTemperatures.row_f + 11.8 * surge + 2.3 * settle + 1.5 * pulse,
   };
 };
 
@@ -625,10 +625,16 @@ const DuctAirflow = ({
   );
 };
 
-const ThermalOverlay = ({ rowTemperatures }: { rowTemperatures: Record<RowId, number> }) => (
+const ThermalOverlay = ({
+  rowTemperatures,
+  baselineTemperatures,
+}: {
+  rowTemperatures: Record<RowId, number>;
+  baselineTemperatures: Record<RowId, number>;
+}) => (
   <g pointerEvents="none">
     {rowOverlays.map((row) => {
-      const deltaC = rowTemperatures[row.id] - baselineRowTemperatures[row.id];
+      const deltaC = rowTemperatures[row.id] - baselineTemperatures[row.id];
       const color = thermalColor(deltaC);
 
       return (
@@ -839,34 +845,22 @@ export default function DatacenterMap({
     return blended;
   }, [nodePositions, simulationActive, simulationResult, simulationStep]);
 
-  const displayDevices = useMemo(() => {
-    if (!simulationActive) {
-      return devices;
+  const displayDevices = devices;
+
+  const baselineRowTemperatures = useMemo<Record<RowId, number>>(() => {
+    if (!simulationResult?.timeline?.rowTemperatures) {
+      return defaultBaselineRowTemperatures;
     }
-
-    const stress = smoothStep(0.2, 0.95, simulationProgress);
-
-    return devices.map((device): Device => {
-      if (device.id === 'BEL-DMP-006') {
-        return {
-          ...device,
-          status: 'fault',
-          anomalyScore: Math.max(device.anomalyScore, 0.94),
-        };
-      }
-
-      if (stress > 0.35 && ['BEL-DMP-008', 'BEL-ACT-004', 'BEL-ACT-007'].includes(device.id)) {
-        const status: Device['status'] = device.status === 'fault' ? 'fault' : 'warning';
-        return {
-          ...device,
-          status,
-          anomalyScore: Math.max(device.anomalyScore, 0.58 + 0.24 * stress),
-        };
-      }
-
-      return device;
-    });
-  }, [devices, simulationActive, simulationProgress]);
+    const rowTimeline = simulationResult.timeline.rowTemperatures;
+    return {
+      row_a: timelineAt(rowTimeline.row_a, 0, defaultBaselineRowTemperatures.row_a),
+      row_b: timelineAt(rowTimeline.row_b, 0, defaultBaselineRowTemperatures.row_b),
+      row_c: timelineAt(rowTimeline.row_c, 0, defaultBaselineRowTemperatures.row_c),
+      row_d: timelineAt(rowTimeline.row_d, 0, defaultBaselineRowTemperatures.row_d),
+      row_e: timelineAt(rowTimeline.row_e, 0, defaultBaselineRowTemperatures.row_e),
+      row_f: timelineAt(rowTimeline.row_f, 0, defaultBaselineRowTemperatures.row_f),
+    };
+  }, [simulationResult]);
 
   const rowTemperatures = useMemo(() => {
     if (!simulationActive || !simulationResult || simulationStep === null) {
@@ -896,13 +890,50 @@ export default function DatacenterMap({
       row_e: lerp(baselineRowTemperatures.row_e, target.row_e, warmupBlend),
       row_f: lerp(baselineRowTemperatures.row_f, target.row_f, warmupBlend),
     };
-  }, [simulationActive, simulationResult, simulationStep, simulationProgress]);
+  }, [simulationActive, simulationResult, simulationStep, simulationProgress, baselineRowTemperatures]);
 
   const crossZoneRiseC = Math.max(
     rowTemperatures.row_b - baselineRowTemperatures.row_b,
     rowTemperatures.row_d - baselineRowTemperatures.row_d,
   );
   const localRiseC = rowTemperatures.row_f - baselineRowTemperatures.row_f;
+
+  const currentRecirculationByZone = useMemo(() => {
+    if (!simulationResult || simulationStep === null) {
+      return null;
+    }
+    const recirc = simulationResult.timeline.zoneRecirculation;
+    if (!recirc) {
+      return null;
+    }
+    return {
+      zone_ab: timelineAt(recirc.zone_ab, simulationStep, 0),
+      zone_cd: timelineAt(recirc.zone_cd, simulationStep, 0),
+      zone_ef: timelineAt(recirc.zone_ef, simulationStep, 0),
+    };
+  }, [simulationResult, simulationStep]);
+
+  const hottestRack = useMemo(() => {
+    if (!simulationResult || simulationStep === null || !simulationResult.timeline.rackCpuTemperatures) {
+      return null;
+    }
+    let hottestRackId: string | null = null;
+    let hottestTemp = -Infinity;
+    for (const [rackId, series] of Object.entries(simulationResult.timeline.rackCpuTemperatures)) {
+      const value = timelineAt(series, simulationStep, -Infinity);
+      if (value > hottestTemp) {
+        hottestTemp = value;
+        hottestRackId = rackId;
+      }
+    }
+    if (!hottestRackId) {
+      return null;
+    }
+    return {
+      rackId: hottestRackId,
+      tempC: hottestTemp,
+    };
+  }, [simulationResult, simulationStep]);
 
   const serviceRiskPercent = simulationResult
     ? Math.round((simulationResult.bayesian.summary.service_degradation_probability ?? 0) * 100)
@@ -1132,6 +1163,16 @@ export default function DatacenterMap({
                   <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
                     Most at-risk zone: {simulationResult.bayesian.summary.most_at_risk_zone.replace('_', ' ')}.
                   </div>
+                  {currentRecirculationByZone && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Recirculation now: AB {(currentRecirculationByZone.zone_ab * 100).toFixed(1)}%, CD {(currentRecirculationByZone.zone_cd * 100).toFixed(1)}%, EF {(currentRecirculationByZone.zone_ef * 100).toFixed(1)}%.
+                    </div>
+                  )}
+                  {hottestRack && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Hottest rack now: {hottestRack.rackId} at {hottestRack.tempC.toFixed(1)}C.
+                    </div>
+                  )}
                   {discoveryEvidence.length > 0 && (
                     <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
                       Evidence: {counterintuitiveFinding ? (discoveryEvidence[1] ?? discoveryEvidence[0]) : discoveryEvidence[0]}
@@ -1193,7 +1234,12 @@ export default function DatacenterMap({
             }}
           >
             <DatacenterBase />
-            {simulationStep !== null && <ThermalOverlay rowTemperatures={rowTemperatures} />}
+            {simulationStep !== null && (
+              <ThermalOverlay
+                rowTemperatures={rowTemperatures}
+                baselineTemperatures={baselineRowTemperatures}
+              />
+            )}
             <DuctAirflow devices={displayDevices} nodePositions={displayNodePositions} />
             <ThermodynamicAirflow devices={displayDevices} nodePositions={displayNodePositions} />
             {displayDevices.map((device) => (

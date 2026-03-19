@@ -259,10 +259,15 @@ export interface SimulationTimeline {
   timesSeconds: number[];
   zoneTemperatures: Record<string, number[]>;
   rowTemperatures: Record<string, number[]>;
+  zoneColdAisleTemperatures?: Record<string, number[]>;
+  zoneHotAisleTemperatures?: Record<string, number[]>;
+  zoneRecirculation?: Record<string, number[]>;
   zoneSupplyFlows: Record<string, number[]>;
   zoneExhaustFlows: Record<string, number[]>;
   nodePositionsTimeline: Record<string, number>[];
   maxCpuTemperature: number[];
+  rackCpuTemperatures?: Record<string, number[]>;
+  rackInletTemperatures?: Record<string, number[]>;
   throttledCpuCount: number[];
   shutdownCpuCount: number[];
 }

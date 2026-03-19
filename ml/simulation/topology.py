@@ -295,6 +295,9 @@ def _build_zone(
         setpoint_c=24.0,
         ambient_c=ambient_temp_c,
         supply_temp_c=supply_temp_c,
+        cold_aisle_temp_c=ambient_temp_c - 1.0,
+        hot_aisle_temp_c=ambient_temp_c + 4.0,
+        recirculation_fraction=0.0,
         heat_sources=heat_sources,
         racks=racks,
     )

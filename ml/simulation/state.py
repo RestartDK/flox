@@ -143,6 +143,9 @@ class ZoneThermalGrid:
     setpoint_c: float = 24.0
     ambient_c: float = 24.0
     supply_temp_c: float = 18.0
+    cold_aisle_temp_c: float = 22.0
+    hot_aisle_temp_c: float = 30.0
+    recirculation_fraction: float = 0.0
     pressure_pa: float = 0.0
     supply_flow_m3s: float = 0.0
     exhaust_flow_m3s: float = 0.0
@@ -173,8 +176,13 @@ class ZoneThermalGrid:
 class StepMetrics:
     time_s: float
     zone_avg_temp_c: dict[str, float]
+    zone_cold_aisle_temp_c: dict[str, float]
+    zone_hot_aisle_temp_c: dict[str, float]
+    zone_recirculation_fraction: dict[str, float]
     zone_supply_flow_m3s: dict[str, float]
     zone_exhaust_flow_m3s: dict[str, float]
+    rack_cpu_temp_c: dict[str, float]
+    rack_inlet_temp_c: dict[str, float]
     max_cpu_temp_c: float
     throttled_cpu_count: int
     shutdown_cpu_count: int

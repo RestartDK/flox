@@ -13,8 +13,13 @@ class SimulationResult:
     dt_s: float
     times_s: list[float]
     zone_avg_temp_c: dict[str, list[float]]
+    zone_cold_aisle_temp_c: dict[str, list[float]]
+    zone_hot_aisle_temp_c: dict[str, list[float]]
+    zone_recirculation_fraction: dict[str, list[float]]
     zone_supply_flow_m3s: dict[str, list[float]]
     zone_exhaust_flow_m3s: dict[str, list[float]]
+    rack_cpu_temp_c: dict[str, list[float]]
+    rack_inlet_temp_c: dict[str, list[float]]
     max_cpu_temp_c: list[float]
     throttled_cpu_count: list[int]
     shutdown_cpu_count: list[int]
@@ -68,6 +73,16 @@ class SimulationEngine:
         zone_avg_temp_c = {
             zone_id: zone.average_temp_c() for zone_id, zone in state.zones.items()
         }
+        zone_cold_aisle_temp_c = {
+            zone_id: zone.cold_aisle_temp_c for zone_id, zone in state.zones.items()
+        }
+        zone_hot_aisle_temp_c = {
+            zone_id: zone.hot_aisle_temp_c for zone_id, zone in state.zones.items()
+        }
+        zone_recirculation_fraction = {
+            zone_id: zone.recirculation_fraction
+            for zone_id, zone in state.zones.items()
+        }
         zone_supply_flow_m3s = {
             zone_id: zone.supply_flow_m3s for zone_id, zone in state.zones.items()
         }
@@ -75,11 +90,15 @@ class SimulationEngine:
             zone_id: zone.exhaust_flow_m3s for zone_id, zone in state.zones.items()
         }
         cpu_temps: list[float] = []
+        rack_cpu_temp_c: dict[str, float] = {}
+        rack_inlet_temp_c: dict[str, float] = {}
         throttled = 0
         shutdown = 0
         for zone in state.zones.values():
             for rack in zone.racks.values():
                 cpu_temps.append(rack.cpu_temp_c)
+                rack_cpu_temp_c[rack.id] = rack.cpu_temp_c
+                rack_inlet_temp_c[rack.id] = rack.inlet_temp_c
                 if rack.throttled:
                     throttled += 1
                 if rack.shutdown:
@@ -88,8 +107,13 @@ class SimulationEngine:
         return StepMetrics(
             time_s=state.time_s,
             zone_avg_temp_c=zone_avg_temp_c,
+            zone_cold_aisle_temp_c=zone_cold_aisle_temp_c,
+            zone_hot_aisle_temp_c=zone_hot_aisle_temp_c,
+            zone_recirculation_fraction=zone_recirculation_fraction,
             zone_supply_flow_m3s=zone_supply_flow_m3s,
             zone_exhaust_flow_m3s=zone_exhaust_flow_m3s,
+            rack_cpu_temp_c=rack_cpu_temp_c,
+            rack_inlet_temp_c=rack_inlet_temp_c,
             max_cpu_temp_c=max_cpu_temp_c,
             throttled_cpu_count=throttled,
             shutdown_cpu_count=shutdown,
@@ -108,6 +132,22 @@ class SimulationEngine:
             zone_id: [metric.zone_avg_temp_c[zone_id] for metric in state.history]
             for zone_id in zone_ids
         }
+        zone_cold_aisle_temp_c = {
+            zone_id: [
+                metric.zone_cold_aisle_temp_c[zone_id] for metric in state.history
+            ]
+            for zone_id in zone_ids
+        }
+        zone_hot_aisle_temp_c = {
+            zone_id: [metric.zone_hot_aisle_temp_c[zone_id] for metric in state.history]
+            for zone_id in zone_ids
+        }
+        zone_recirculation_fraction = {
+            zone_id: [
+                metric.zone_recirculation_fraction[zone_id] for metric in state.history
+            ]
+            for zone_id in zone_ids
+        }
         zone_supply_flow_m3s = {
             zone_id: [metric.zone_supply_flow_m3s[zone_id] for metric in state.history]
             for zone_id in zone_ids
@@ -116,14 +156,34 @@ class SimulationEngine:
             zone_id: [metric.zone_exhaust_flow_m3s[zone_id] for metric in state.history]
             for zone_id in zone_ids
         }
+        rack_ids = (
+            list(state.history[0].rack_cpu_temp_c.keys()) if state.history else []
+        )
+        rack_cpu_temp_c = {
+            rack_id: [
+                metric.rack_cpu_temp_c.get(rack_id, 0.0) for metric in state.history
+            ]
+            for rack_id in rack_ids
+        }
+        rack_inlet_temp_c = {
+            rack_id: [
+                metric.rack_inlet_temp_c.get(rack_id, 0.0) for metric in state.history
+            ]
+            for rack_id in rack_ids
+        }
         return SimulationResult(
             scenario_name=scenario_name,
             duration_s=duration_s,
             dt_s=state.dt_s,
             times_s=times_s,
             zone_avg_temp_c=zone_avg_temp_c,
+            zone_cold_aisle_temp_c=zone_cold_aisle_temp_c,
+            zone_hot_aisle_temp_c=zone_hot_aisle_temp_c,
+            zone_recirculation_fraction=zone_recirculation_fraction,
             zone_supply_flow_m3s=zone_supply_flow_m3s,
             zone_exhaust_flow_m3s=zone_exhaust_flow_m3s,
+            rack_cpu_temp_c=rack_cpu_temp_c,
+            rack_inlet_temp_c=rack_inlet_temp_c,
             max_cpu_temp_c=[metric.max_cpu_temp_c for metric in state.history],
             throttled_cpu_count=[
                 metric.throttled_cpu_count for metric in state.history

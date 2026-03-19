@@ -306,10 +306,15 @@ class SimulationTimelineView(BaseModel):
     timesSeconds: list[float]
     zoneTemperatures: dict[str, list[float]]
     rowTemperatures: dict[str, list[float]]
+    zoneColdAisleTemperatures: dict[str, list[float]] = Field(default_factory=dict)
+    zoneHotAisleTemperatures: dict[str, list[float]] = Field(default_factory=dict)
+    zoneRecirculation: dict[str, list[float]] = Field(default_factory=dict)
     zoneSupplyFlows: dict[str, list[float]]
     zoneExhaustFlows: dict[str, list[float]]
     nodePositionsTimeline: list[dict[str, float]]
     maxCpuTemperature: list[float]
+    rackCpuTemperatures: dict[str, list[float]] = Field(default_factory=dict)
+    rackInletTemperatures: dict[str, list[float]] = Field(default_factory=dict)
     throttledCpuCount: list[int]
     shutdownCpuCount: list[int]
 

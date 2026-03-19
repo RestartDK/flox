@@ -121,7 +121,22 @@ def run_simulation_bundle(
             zone_id: [round(value, 4) for value in series]
             for zone_id, series in candidate_result.zone_avg_temp_c.items()
         },
-        "rowTemperatures": _build_row_temperatures(candidate_result.zone_avg_temp_c),
+        "rowTemperatures": _build_row_temperatures(
+            candidate_result.zone_cold_aisle_temp_c,
+            candidate_result.zone_hot_aisle_temp_c,
+        ),
+        "zoneColdAisleTemperatures": {
+            zone_id: [round(value, 4) for value in series]
+            for zone_id, series in candidate_result.zone_cold_aisle_temp_c.items()
+        },
+        "zoneHotAisleTemperatures": {
+            zone_id: [round(value, 4) for value in series]
+            for zone_id, series in candidate_result.zone_hot_aisle_temp_c.items()
+        },
+        "zoneRecirculation": {
+            zone_id: [round(value, 5) for value in series]
+            for zone_id, series in candidate_result.zone_recirculation_fraction.items()
+        },
         "zoneSupplyFlows": {
             zone_id: [round(value, 6) for value in series]
             for zone_id, series in candidate_result.zone_supply_flow_m3s.items()
@@ -134,6 +149,14 @@ def run_simulation_bundle(
         "maxCpuTemperature": [
             round(value, 4) for value in candidate_result.max_cpu_temp_c
         ],
+        "rackCpuTemperatures": {
+            rack_id: [round(value, 4) for value in series]
+            for rack_id, series in candidate_result.rack_cpu_temp_c.items()
+        },
+        "rackInletTemperatures": {
+            rack_id: [round(value, 4) for value in series]
+            for rack_id, series in candidate_result.rack_inlet_temp_c.items()
+        },
         "throttledCpuCount": candidate_result.throttled_cpu_count,
         "shutdownCpuCount": candidate_result.shutdown_cpu_count,
     }
@@ -594,12 +617,23 @@ def _scale_position(
 
 
 def _build_row_temperatures(
-    zone_temps: dict[str, list[float]],
+    zone_cold_temps: dict[str, list[float]],
+    zone_hot_temps: dict[str, list[float]],
 ) -> dict[str, list[float]]:
-    zone_ab = zone_temps.get("zone_ab") or []
-    zone_cd = zone_temps.get("zone_cd") or []
-    zone_ef = zone_temps.get("zone_ef") or []
-    step_count = max(len(zone_ab), len(zone_cd), len(zone_ef))
+    zone_ab_cold = zone_cold_temps.get("zone_ab") or []
+    zone_cd_cold = zone_cold_temps.get("zone_cd") or []
+    zone_ef_cold = zone_cold_temps.get("zone_ef") or []
+    zone_ab_hot = zone_hot_temps.get("zone_ab") or []
+    zone_cd_hot = zone_hot_temps.get("zone_cd") or []
+    zone_ef_hot = zone_hot_temps.get("zone_ef") or []
+    step_count = max(
+        len(zone_ab_cold),
+        len(zone_cd_cold),
+        len(zone_ef_cold),
+        len(zone_ab_hot),
+        len(zone_cd_hot),
+        len(zone_ef_hot),
+    )
 
     def _at(series: list[float], index: int, fallback: float) -> float:
         if not series:
@@ -615,15 +649,12 @@ def _build_row_temperatures(
         "row_f": [],
     }
     for index in range(step_count):
-        ab = _at(zone_ab, index, 24.0)
-        cd = _at(zone_cd, index, 24.0)
-        ef = _at(zone_ef, index, 24.0)
-        rows["row_a"].append(round(ab - 4.6, 4))
-        rows["row_b"].append(round(ab + 4.4, 4))
-        rows["row_c"].append(round(cd - 4.5, 4))
-        rows["row_d"].append(round(cd + 4.5, 4))
-        rows["row_e"].append(round(ef - 4.1, 4))
-        rows["row_f"].append(round(ef + 5.2, 4))
+        rows["row_a"].append(round(_at(zone_ab_cold, index, 24.0), 4))
+        rows["row_b"].append(round(_at(zone_ab_hot, index, 30.0), 4))
+        rows["row_c"].append(round(_at(zone_cd_cold, index, 24.0), 4))
+        rows["row_d"].append(round(_at(zone_cd_hot, index, 30.0), 4))
+        rows["row_e"].append(round(_at(zone_ef_cold, index, 24.0), 4))
+        rows["row_f"].append(round(_at(zone_ef_hot, index, 30.0), 4))
 
     return rows
 
