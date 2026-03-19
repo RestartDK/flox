@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+
+from shacklib.mock_facility import build_catalog, build_seed_state
 
 STATUS_RANK = {
     "healthy": 0,
     "warning": 1,
     "critical": 2,
+    "offline": 3,
 }
 
 RANK_STATUS = {
     0: "healthy",
     1: "warning",
     2: "critical",
+    3: "offline",
 }
 
 
@@ -73,42 +78,14 @@ def _new_node(node_id: str, node_type: str, parent_ids: list[str]) -> dict[str, 
         "label": _label_from_node_id(node_id),
         "type": node_type,
         "status": "healthy",
+        "position": 0.0,
         "parentIds": parent_ids,
         "latestTelemetry": {},
         "latestTelemetryAt": None,
         "latestFaultId": None,
         "updatedAt": utc_now_iso(),
+        "historyByVariable": {},
     }
-
-
-def ingest_node(state: dict[str, Any], payload: dict[str, Any]) -> None:
-    nodes: dict[str, dict[str, Any]] = state.setdefault("nodes", {})
-
-    node_id = payload["nodeId"]
-    parent_ids = _dedupe_ids(payload.get("parentIds", []))
-    timestamp = to_utc_iso(payload["timestamp"])
-
-    node = nodes.get(node_id)
-    if node is None:
-        node = _new_node(
-            node_id, str(payload.get("deviceType") or "device"), parent_ids
-        )
-        nodes[node_id] = node
-
-    node["type"] = str(payload.get("deviceType") or node.get("type") or "device")
-    node["parentIds"] = parent_ids
-    node["latestTelemetry"] = payload.get("telemetry") or {}
-    node["latestTelemetryAt"] = timestamp
-    node["label"] = _label_from_node_id(node_id)
-    node["updatedAt"] = utc_now_iso()
-    node.setdefault("status", "healthy")
-    node.setdefault("latestFaultId", None)
-
-    for parent_id in parent_ids:
-        if parent_id not in nodes:
-            nodes[parent_id] = _new_node(parent_id, "system", [])
-
-    state.setdefault("meta", {})["lastIngestAt"] = utc_now_iso()
 
 
 def _as_float(value: Any) -> float | None:
@@ -121,7 +98,101 @@ def _as_float(value: Any) -> float | None:
             return float(value)
         except ValueError:
             return None
+    if isinstance(value, dict):
+        return _as_float(value.get("value"))
     return None
+
+
+def _upsert_history_point(
+    series: list[dict[str, Any]], timestamp: str, value: float
+) -> list[dict[str, Any]]:
+    next_point = {"time": timestamp, "value": round(value, 2)}
+    updated = list(series)
+
+    for index, point in enumerate(updated):
+        if point.get("time") == timestamp:
+            updated[index] = next_point
+            break
+    else:
+        updated.append(next_point)
+
+    updated.sort(key=lambda point: point.get("time") or "")
+    return updated
+
+
+def _normalize_node_position(
+    telemetry: dict[str, Any], current_position: float | None
+) -> float:
+    position_percent = _as_float(telemetry.get("position_percent"))
+    if position_percent is not None:
+        return round(max(0.0, min(1.0, position_percent / 100.0)), 4)
+
+    position = _as_float(telemetry.get("position"))
+    if position is not None:
+        normalized = position / 100.0 if position > 1 else position
+        return round(max(0.0, min(1.0, normalized)), 4)
+
+    if current_position is not None:
+        return round(max(0.0, min(1.0, current_position)), 4)
+
+    return 0.0
+
+
+def seed_mock_state_if_empty(state: dict[str, Any]) -> bool:
+    if state.get("nodes"):
+        return False
+
+    seeded = build_seed_state()
+    state.clear()
+    state.update(seeded)
+    return True
+
+
+def ingest_node(state: dict[str, Any], payload: dict[str, Any]) -> None:
+    nodes: dict[str, dict[str, Any]] = state.setdefault("nodes", {})
+
+    node_id = payload["nodeId"]
+    parent_ids = _dedupe_ids(payload.get("parentIds", []))
+    timestamp = to_utc_iso(payload["timestamp"])
+    telemetry = payload.get("telemetry") or {}
+
+    node = nodes.get(node_id)
+    if node is None:
+        node = _new_node(
+            node_id, str(payload.get("deviceType") or "device"), parent_ids
+        )
+        nodes[node_id] = node
+
+    node["type"] = str(payload.get("deviceType") or node.get("type") or "device")
+    node["parentIds"] = parent_ids
+    node["label"] = _label_from_node_id(node_id)
+    node["updatedAt"] = utc_now_iso()
+    node.setdefault("status", "healthy")
+    node.setdefault("latestFaultId", None)
+    node.setdefault("historyByVariable", {})
+
+    latest_telemetry = dict(node.get("latestTelemetry") or {})
+    for key, raw_value in telemetry.items():
+        numeric_value = _as_float(raw_value)
+        if numeric_value is None:
+            continue
+
+        history = node["historyByVariable"].setdefault(key, [])
+        node["historyByVariable"][key] = _upsert_history_point(
+            history, timestamp, numeric_value
+        )
+        latest_telemetry[key] = round(numeric_value, 2)
+
+    node["position"] = _normalize_node_position(telemetry, node.get("position"))
+    latest_telemetry["position"] = node["position"]
+    node["latestTelemetry"] = latest_telemetry
+    node["latestTelemetryAt"] = timestamp
+
+    for parent_id in parent_ids:
+        if parent_id not in nodes:
+            nodes[parent_id] = _new_node(parent_id, "system", [])
+
+    state.setdefault("meta", {})["lastIngestAt"] = utc_now_iso()
 
 
 def _clamp_probability(value: float) -> float:
@@ -351,44 +422,316 @@ def resolve_fault(
     }
 
 
-def build_status_payload(state: dict[str, Any]) -> dict[str, Any]:
-    nodes: dict[str, dict[str, Any]] = state.get("nodes", {})
-    faults: dict[str, dict[str, Any]] = state.get("faults", {})
+def _history_series(node: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    history_by_variable = node.get("historyByVariable") or {}
+    series = history_by_variable.get(key) or []
+    return [
+        {
+            "time": point.get("time") or utc_now_iso(),
+            "value": round(float(point.get("value", 0.0)), 2),
+        }
+        for point in sorted(series, key=lambda item: item.get("time") or "")
+    ]
 
-    result_nodes: list[dict[str, Any]] = []
+
+def _history_series_for_percent(node: dict[str, Any]) -> list[dict[str, Any]]:
+    direct_percent = _history_series(node, "position_percent")
+    if direct_percent:
+        return direct_percent
+
+    raw_position = _history_series(node, "position")
+    normalized: list[dict[str, Any]] = []
+    for point in raw_position:
+        value = point["value"]
+        normalized.append(
+            {
+                "time": point["time"],
+                "value": round(value * 100 if 0 <= value <= 1 else value, 2),
+            }
+        )
+    return normalized
+
+
+def _title_case(value: str) -> str:
+    return " ".join(part.capitalize() for part in value.split("_"))
+
+
+def _fault_severity(node_status: str, probability: float) -> str:
+    if node_status == "critical":
+        return "critical"
+    if probability >= 0.6:
+        return "high"
+    if probability >= 0.4:
+        return "medium"
+    return "low"
+
+
+def _device_status(node_status: str | None) -> str:
+    if node_status == "critical":
+        return "fault"
+    if node_status in {"healthy", "warning", "offline"}:
+        return node_status
+    return "healthy"
+
+
+def _parse_daily_amount(value: str) -> float:
+    digits = "".join(char for char in value if char.isdigit() or char in {".", ","})
+    if not digits:
+        return 0.0
+    return float(digits.replace(",", ""))
+
+
+def _format_currency_per_day(value: float) -> str:
+    return f"${round(value):,}/day"
+
+
+def _format_energy_waste_per_day(value: float) -> str:
+    return f"{round(value)} kWh/day"
+
+
+def _catalog_from_state(state: dict[str, Any]) -> dict[str, Any]:
+    catalog = deepcopy(state.get("catalog") or build_catalog())
+    nodes = state.get("nodes") or {}
+
+    for template in catalog.get("deviceTemplates", []):
+        node = nodes.get(template.get("id"))
+        if not node:
+            continue
+
+        torque = _history_series(node, "torque")
+        position = _history_series_for_percent(node)
+        temperature = _history_series(node, "temperature")
+        if torque:
+            template["torque"] = torque
+        if position:
+            template["position"] = position
+        if temperature:
+            template["temperature"] = temperature
+
+    return catalog
+
+
+def _open_fault_for_node(
+    node: dict[str, Any], faults: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    fault_id = node.get("latestFaultId")
+    if not isinstance(fault_id, str):
+        return None
+
+    fault = faults.get(fault_id)
+    if not fault or fault.get("state") != "open":
+        return None
+
+    return fault
+
+
+def _build_raw_nodes_payload(
+    nodes: dict[str, dict[str, Any]], faults: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+
     for node_id in sorted(nodes.keys()):
         node = nodes[node_id]
-        fault_payload = None
-
-        fault_id = node.get("latestFaultId")
-        if isinstance(fault_id, str):
-            fault = faults.get(fault_id)
-            if fault:
-                fault_payload = {
-                    "id": fault.get("id"),
-                    "state": fault.get("state", "open"),
-                    "kind": fault.get("kind"),
-                    "probability": fault.get("probability", 0.0),
-                    "summary": fault.get("summary"),
-                    "recommendedAction": fault.get("recommendedAction"),
-                }
-
         status = node.get("status")
         if status not in STATUS_RANK:
             status = "healthy"
 
-        result_nodes.append(
+        fault = _open_fault_for_node(node, faults)
+        fault_payload = None
+        if fault:
+            fault_payload = {
+                "id": fault.get("id"),
+                "state": "open",
+                "kind": fault.get("kind"),
+                "probability": fault.get("probability", 0.0),
+                "summary": fault.get("summary"),
+                "recommendedAction": fault.get("recommendedAction"),
+            }
+
+        result.append(
             {
                 "id": node_id,
                 "label": node.get("label") or _label_from_node_id(node_id),
                 "type": node.get("type") or "device",
                 "status": status,
+                "position": round(float(node.get("position") or 0.0), 4),
                 "parentIds": node.get("parentIds") or [],
                 "fault": fault_payload,
             }
         )
 
+    return result
+
+
+def _build_history_payload(nodes: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for node_id in sorted(nodes.keys()):
+        history_by_variable = nodes[node_id].get("historyByVariable") or {}
+        payload[node_id] = {
+            key: [
+                {
+                    "time": point.get("time") or utc_now_iso(),
+                    "value": round(float(point.get("value", 0.0)), 2),
+                }
+                for point in sorted(series, key=lambda item: item.get("time") or "")
+            ]
+            for key, series in sorted(history_by_variable.items())
+        }
+    return payload
+
+
+def _build_frontend_faults(
+    node: dict[str, Any],
+    fault: dict[str, Any] | None,
+    fault_meta_by_device_id: dict[str, dict[str, str]],
+) -> list[dict[str, Any]]:
+    if not fault:
+        return []
+
+    fault_meta = fault_meta_by_device_id.get(node["id"], {})
+    return [
+        {
+            "id": fault.get("id"),
+            "type": _title_case(str(fault.get("kind") or "unknown")),
+            "severity": _fault_severity(
+                str(node.get("status") or "healthy"),
+                float(fault.get("probability") or 0.0),
+            ),
+            "diagnosis": fault.get("summary") or "",
+            "recommendation": fault.get("recommendedAction") or "",
+            "detectedAt": fault.get("openedAt") or utc_now_iso(),
+            "estimatedImpact": fault_meta.get(
+                "estimatedImpact", "$0/day impact estimate pending"
+            ),
+            "energyWaste": fault_meta.get("energyWaste", "0 kWh/day"),
+        }
+    ]
+
+
+def _build_derived_devices(
+    state: dict[str, Any],
+    catalog: dict[str, Any],
+    faults: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    nodes = state.get("nodes") or {}
+    fault_meta_by_device_id = catalog.get("faultMetaByDeviceId") or {}
+    devices: list[dict[str, Any]] = []
+
+    for template in catalog.get("deviceTemplates", []):
+        node = nodes.get(template["id"], {})
+        open_fault = _open_fault_for_node(node, faults) if node else None
+        torque = _history_series(node, "torque") if node else []
+        position = _history_series_for_percent(node) if node else []
+        temperature = _history_series(node, "temperature") if node else []
+
+        devices.append(
+            {
+                "id": template["id"],
+                "name": template["name"],
+                "model": template["model"],
+                "serial": template["serial"],
+                "type": template["type"],
+                "zone": template["zone"],
+                "zoneId": template["zoneId"],
+                "status": _device_status(node.get("status")),
+                "x": template["x"],
+                "y": template["y"],
+                "installedDate": template["installedDate"],
+                "anomalyScore": round(
+                    float(open_fault.get("probability"))
+                    if open_fault
+                    else float(template.get("baseAnomalyScore") or 0.0),
+                    2,
+                ),
+                "airflowDirection": template.get("airflowDirection"),
+                "torque": torque or deepcopy(template.get("torque") or []),
+                "position": position or deepcopy(template.get("position") or []),
+                "temperature": temperature
+                or deepcopy(template.get("temperature") or []),
+                "faults": _build_frontend_faults(
+                    {"id": template["id"], **node},
+                    open_fault,
+                    fault_meta_by_device_id,
+                ),
+            }
+        )
+
+    return devices
+
+
+def _build_building_stats(devices: list[dict[str, Any]]) -> dict[str, Any]:
+    total_devices = len(devices)
+    healthy_devices = sum(1 for device in devices if device["status"] == "healthy")
+    warning_devices = sum(1 for device in devices if device["status"] == "warning")
+    fault_devices = sum(1 for device in devices if device["status"] == "fault")
+    active_faults = sum(len(device["faults"]) for device in devices)
+
+    total_energy_waste = sum(
+        _parse_daily_amount(fault["energyWaste"])
+        for device in devices
+        for fault in device["faults"]
+    )
+    total_estimated_cost = sum(
+        _parse_daily_amount(fault["estimatedImpact"])
+        for device in devices
+        for fault in device["faults"]
+    )
+
+    status_score = {
+        "healthy": 100,
+        "warning": 78,
+        "fault": 42,
+        "offline": 20,
+    }
+    overall_health = (
+        0.0
+        if total_devices == 0
+        else round(
+            sum(status_score[device["status"]] for device in devices) / total_devices, 1
+        )
+    )
+
+    return {
+        "totalDevices": total_devices,
+        "healthyDevices": healthy_devices,
+        "warningDevices": warning_devices,
+        "faultDevices": fault_devices,
+        "overallHealth": overall_health,
+        "energyWaste": _format_energy_waste_per_day(total_energy_waste),
+        "estimatedCost": _format_currency_per_day(total_estimated_cost),
+        "activeFaults": active_faults,
+    }
+
+
+def build_status_payload(state: dict[str, Any]) -> dict[str, Any]:
+    if not state.get("nodes"):
+        seed_mock_state_if_empty(state)
+
+    nodes: dict[str, dict[str, Any]] = state.get("nodes", {})
+    faults: dict[str, dict[str, Any]] = state.get("faults", {})
+    meta: dict[str, Any] = state.get("meta", {})
+
+    catalog = _catalog_from_state(state)
+    raw_nodes = _build_raw_nodes_payload(nodes, faults)
+    derived_devices = _build_derived_devices(state, catalog, faults)
+
     return {
         "generatedAt": utc_now_iso(),
-        "nodes": result_nodes,
+        "nodes": raw_nodes,
+        "catalog": catalog,
+        "historyByNodeId": _build_history_payload(nodes),
+        "derived": {
+            "devices": derived_devices,
+            "buildingStats": _build_building_stats(derived_devices),
+            "nodePositions": {
+                node["id"]: node["position"] for node in raw_nodes if "id" in node
+            },
+        },
+        "meta": {
+            "lastIngestAt": meta.get("lastIngestAt"),
+            "lastClassificationAt": meta.get("lastClassificationAt"),
+            "lastFaultResolutionAt": meta.get("lastFaultResolutionAt"),
+            "seedSource": meta.get("seedSource"),
+            "seededAt": meta.get("seededAt"),
+        },
     }
