@@ -2,7 +2,9 @@
     "agents": [
         {
             "config": "agent_configs/On-Site-Engineer-Escalation.json",
-            "id": "agent_1601km3cn7r1e15any05zd5683h8"
+            "id": "agent_1601km3cn7r1e15any05zd5683h8",
+            "version_id": "agtvrsn_5401km3rcm97e3gtrt5wtf49k4c6",
+            "branch_id": "agtbrch_5101km3ct58ne35skmhb86w8bsq9"
         }
     ]
 }
