@@ -1,12 +1,5 @@
 # Flox
 
-**Real-time fault intelligence for HVAC actuators.** Flox ingests live telemetry from Belimo actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
-
-Built for facility managers, system integrators, and HVAC installers who need to move from reactive maintenance to data-driven operations.
-
----
-
-### Frontend
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white&labelColor=20232A)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
@@ -14,29 +7,24 @@ Built for facility managers, system integrators, and HVAC installers who need to
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Radix UI](https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=radixui&logoColor=white)
 ![Bun](https://img.shields.io/badge/Bun-1.2-FBF0DF?style=flat-square&logo=bun&logoColor=black)
-
-### Backend
-
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Celery](https://img.shields.io/badge/Celery-37814A?style=flat-square&logo=celery&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![uv](https://img.shields.io/badge/uv-DE5FE9?style=flat-square)
-
-### Intelligence
-
 ![Anthropic](https://img.shields.io/badge/Claude-Operations_Agent-191919?style=flat-square&logo=anthropic&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white)
 ![XGBoost](https://img.shields.io/badge/XGBoost-189AB4?style=flat-square)
-
-### Infrastructure
-
 ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Nx](https://img.shields.io/badge/Nx-143055?style=flat-square&logo=nx&logoColor=white)
 
----
+> **Real-time fault intelligence for HVAC actuators.** Flox ingests live telemetry from Belimo actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
+
+Built for facility managers, system integrators, and HVAC installers who need to move from reactive maintenance to data-driven operations.
+
+
 
 ## What it does
 
@@ -50,7 +38,6 @@ Flox closes that gap:
 4. **Facility dashboard** — a live map view shows zone health, device positions, and active faults across the building. An issues panel lists all open faults ranked by severity, with energy waste and estimated cost impact per fault.
 5. **Operations agent** — a Claude-powered agent answers natural-language questions about faults, runs diagnosis on demand, retrieves fault history, and can execute corrective actions with explicit operator approval before any write is committed.
 
----
 
 ## Fault types detected
 
@@ -64,7 +51,6 @@ Flox closes that gap:
 
 ML-based classifiers (when enabled) extend coverage beyond rule thresholds.
 
----
 
 ## Quick start
 
@@ -82,7 +68,6 @@ make doctor               # verify toolchain
 make help                 # list all targets
 ```
 
----
 
 ## Data pipeline
 
@@ -105,7 +90,6 @@ Actuator  →  POST /api/ingest        (FastAPI)
               map view + issues panel + device telemetry charts
 ```
 
----
 
 ## Repository layout
 
@@ -138,7 +122,6 @@ docker/               Per-service Dockerfiles
 scripts/              Utility scripts (seed, migration helpers)
 ```
 
----
 
 ## Operations agent
 
@@ -162,7 +145,6 @@ Example prompts:
 - `Run diagnosis for BEL-VLV-003 now.`
 - `Resolve fault fault-a3b2c1d0 with note "validated on site".`
 
----
 
 ## Environment variables
 
@@ -181,7 +163,6 @@ Copy `.env.example` to `.env` and fill in the values relevant to your deployment
 | `VITE_REQUIRE_AUTH` | Enable Supabase session auth on the frontend |
 | `LOKI_PORT` / `GRAFANA_PORT` | Enable remote log aggregation |
 
----
 
 ## Make targets
 
@@ -207,7 +188,6 @@ Copy `.env.example` to `.env` and fill in the values relevant to your deployment
 | `make clean` | Remove caches and build artifacts |
 | `make doctor` | Verify toolchain (Python, uv, Bun, Docker) |
 
----
 
 ## Optional services
 
@@ -222,7 +202,6 @@ Copy `.env.example` to `.env` and fill in the values relevant to your deployment
 | `logging` | + Loki + Grafana | `make lift.logging` |
 | `database` | + MongoDB | `make lift.database` |
 
----
 
 ## Database schema
 
@@ -287,7 +266,6 @@ erDiagram
     backend_agent_meta ||--o{ backend_agent_audit_log : "audit log"
 ```
 
----
 
 ## Python logging
 
@@ -300,7 +278,6 @@ logger.info("diagnosis cycle complete", extra={"processed": 8, "open_faults": 2}
 
 Logs are written as structured JSON to console and `./logs/`. Set `LOKI_PORT` and run `make lift.logging` to push logs to Loki. Grafana is available at `http://localhost:$GRAFANA_PORT` — add a Loki data source at `http://loki:3100`.
 
----
 
 ## Frontend auth
 
