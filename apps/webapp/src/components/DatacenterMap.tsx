@@ -445,11 +445,7 @@ const PortBreathing = ({
   }
 
   const thermalDrive = temperatureC === undefined ? 0 : clamp01((temperatureC - 24) / 20);
-  const durationSeconds = Math.max(1.8, (4.4 - flow * 2) * (1 - 0.32 * thermalDrive));
-  const duration = `${durationSeconds}s`;
   const isIntake = type === 'intake';
-  const cx = isIntake ? 18 : 1172;
-  const cy = isIntake ? 567.5 : 107.5;
   const stroke = temperatureC === undefined
     ? isIntake
       ? supplyPalette
@@ -459,45 +455,6 @@ const PortBreathing = ({
 
   return (
     <g>
-      {Array.from({ length: 3 }, (_, index) => {
-        const begin = `${(index * durationSeconds) / 3}s`;
-        return (
-          <ellipse
-            key={`${type}-ring-${index}`}
-            cx={cx}
-            cy={cy}
-            rx={isIntake ? 28 : 10}
-            ry={isIntake ? 18 : 7}
-            fill="none"
-            stroke={`hsl(${stroke} / 0.45)`}
-            strokeWidth={1.1}
-            opacity={0}
-          >
-            <animate
-              attributeName="rx"
-              dur={duration}
-              begin={begin}
-              repeatCount="indefinite"
-              values={isIntake ? '32;18;8' : '10;24;38'}
-            />
-            <animate
-              attributeName="ry"
-              dur={duration}
-              begin={begin}
-              repeatCount="indefinite"
-              values={isIntake ? '20;11;4' : '7;14;22'}
-            />
-            <animate
-              attributeName="opacity"
-              dur={duration}
-              begin={begin}
-              repeatCount="indefinite"
-              values={pulsing ? '0;0;0.65;0.18;0' : '0;0.65;0.15;0'}
-              keyTimes={pulsing ? '0;0.18;0.32;0.62;1' : undefined}
-            />
-          </ellipse>
-        );
-      })}
       <ThermalParticleStream
         path={path}
         flow={flow}
