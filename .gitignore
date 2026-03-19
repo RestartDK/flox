@@ -10,3 +10,11 @@ FLAT.xml
 **/package-lock.json
 .nx/
 .superset/
+ml/tensorboard/
+ml/data/processed/*
+!ml/data/processed/synthetic_benchmark/
+!ml/data/processed/synthetic_benchmark/**
+ml/data/processed/synthetic_benchmark/*.csv
+ml/models/weights/*
+!ml/models/weights/synthetic_benchmark/
+!ml/models/weights/synthetic_benchmark/**

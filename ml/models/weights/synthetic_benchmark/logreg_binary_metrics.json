@@ -1,0 +1,68 @@
+{
+  "task": "binary",
+  "model_type": "logreg",
+  "splits": {
+    "train": {
+      "balanced_accuracy": 0.798231206200696,
+      "f1": 0.7468510743393431,
+      "confusion_matrix": [
+        [
+          5474,
+          1142
+        ],
+        [
+          908,
+          3024
+        ]
+      ],
+      "roc_auc": 0.8826559599651144,
+      "pr_auc": 0.8476127310240826,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "val": {
+      "balanced_accuracy": 0.7828169510965755,
+      "f1": 0.7216117216117216,
+      "confusion_matrix": [
+        [
+          1211,
+          236
+        ],
+        [
+          220,
+          591
+        ]
+      ],
+      "roc_auc": 0.8613918673525821,
+      "pr_auc": 0.8192979638457055,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "test": {
+      "balanced_accuracy": 0.798491725316972,
+      "f1": 0.7475333720255368,
+      "confusion_matrix": [
+        [
+          1140,
+          250
+        ],
+        [
+          185,
+          644
+        ]
+      ],
+      "roc_auc": 0.878204649790421,
+      "pr_auc": 0.8398168753132188,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    }
+  },
+  "fit_seconds": 0.10781125002540648,
+  "artifact_path": "/Users/paulruiz/Documents/Starthack/starthack26/ml/models/weights/synthetic_benchmark/logreg_binary.pkl"
+}

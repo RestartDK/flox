@@ -1,0 +1,71 @@
+{
+  "task": "binary",
+  "model_type": "conv1d_classifier",
+  "splits": {
+    "train": {
+      "loss": 0.26378053426742554,
+      "balanced_accuracy": 0.8695937036021064,
+      "f1": 0.8376288659793815,
+      "confusion_matrix": [
+        [
+          6038,
+          578
+        ],
+        [
+          682,
+          3250
+        ]
+      ],
+      "roc_auc": 0.9544524333561722,
+      "pr_auc": 0.9329719842855533,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "val": {
+      "loss": 0.3417484760284424,
+      "balanced_accuracy": 0.8177295258611508,
+      "f1": 0.7670206121174266,
+      "confusion_matrix": [
+        [
+          1271,
+          176
+        ],
+        [
+          197,
+          614
+        ]
+      ],
+      "roc_auc": 0.9192120778821269,
+      "pr_auc": 0.8877980912324404,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    },
+    "test": {
+      "loss": 0.3167416453361511,
+      "balanced_accuracy": 0.8408214803308138,
+      "f1": 0.8022388059701493,
+      "confusion_matrix": [
+        [
+          1256,
+          134
+        ],
+        [
+          184,
+          645
+        ]
+      ],
+      "roc_auc": 0.9321788407633362,
+      "pr_auc": 0.9081455543142161,
+      "class_names": [
+        "Normal",
+        "Anomaly"
+      ]
+    }
+  },
+  "fit_seconds": 96.87317308300408,
+  "artifact_path": "/Users/paulruiz/Documents/Starthack/starthack26/ml/models/weights/synthetic_benchmark/conv1d_classifier_binary.pt"
+}
