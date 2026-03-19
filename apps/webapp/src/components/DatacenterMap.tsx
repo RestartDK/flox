@@ -89,6 +89,27 @@ const exhaustFlowPaths = [
   { id: 'BEL-DMP-006', d: 'M 950 195 L 950 107.5' },
 ];
 
+const thermalLanes = [
+  { key: 'lane-ab', supplyId: 'BEL-VLV-003', exhaustId: 'BEL-DMP-002', supplyX: 200, hotX: 350 },
+  { key: 'lane-cd', supplyId: 'BEL-VLV-005', exhaustId: 'BEL-ACT-004', supplyX: 500, hotX: 650 },
+  { key: 'lane-ef', supplyId: 'BEL-ACT-007', exhaustId: 'BEL-DMP-006', supplyX: 800, hotX: 950 },
+] as const;
+
+const laneHeights = [258, 345, 432];
+
+const buildColdSupplyPath = (supplyX: number, laneY: number, offset = 0) =>
+  `M 18 567.5 L ${supplyX} 567.5 L ${supplyX} 490 L ${supplyX + offset} ${laneY}`;
+
+const buildServerPassPath = (supplyX: number, hotX: number, laneY: number, lift = 0) =>
+  `M ${supplyX} ${laneY} C ${supplyX + 26} ${laneY - 6 - lift}, ${hotX - 26} ${laneY + 6 - lift}, ${hotX} ${laneY - lift}`;
+
+const buildHotRisePath = (hotX: number, laneY: number, drift = 0) =>
+  `M ${hotX} ${laneY} C ${hotX + 18 + drift} ${laneY - 34}, ${hotX - 12 + drift} ${laneY - 92}, ${hotX} 195 ` +
+  `L ${hotX} 107.5 L 1170 107.5`;
+
+const buildIntakePortPath = () => 'M 82 567.5 C 62 567.5, 42 567.5, 18 567.5';
+const buildExhaustPortPath = () => 'M 1118 107.5 C 1140 107.5, 1162 107.5, 1188 107.5';
+
 const averageFlow = (nodePositions: Record<string, number>, ids: string[]) => {
   if (ids.length === 0) {
     return 0;
@@ -204,6 +225,7 @@ const timelineAt = (series: number[] | undefined, index: number, fallback: numbe
 };
 
 const lerp = (from: number, to: number, blend: number) => from + (to - from) * blend;
+const isPulsingStatus = (status: Device['status'] | undefined) => status === 'warning' || status === 'fault';
 
 const DeviceNode = ({
   device,
@@ -285,10 +307,12 @@ const FlowDots = ({
   d,
   flow,
   color,
+  pulsing = false,
 }: {
   d: string;
   flow: number;
   color: string;
+  pulsing?: boolean;
 }) => {
   if (flow <= 0) {
     return null;
@@ -296,6 +320,7 @@ const FlowDots = ({
 
   const duration = `${Math.max(1.35, 5.5 - flow * 4)}s`;
   const dotCount = flow >= 0.75 ? 4 : flow >= 0.35 ? 3 : 2;
+  const durationSeconds = Number.parseFloat(duration);
 
   return (
     <g>
@@ -304,16 +329,25 @@ const FlowDots = ({
         <circle key={`${d}-${index}`} r={4} fill={`hsl(${color})`} opacity={0.9}>
           <animateMotion
             dur={duration}
-            begin={`${(index * Number.parseFloat(duration)) / dotCount}s`}
+            begin={`${(pulsing ? index * durationSeconds * 0.16 : (index * durationSeconds) / dotCount).toFixed(2)}s`}
             repeatCount="indefinite"
             path={d}
           />
           <animate
             attributeName="opacity"
-            values="0;0.92;0"
+            values={pulsing ? '0;0;1;0.2;0;0' : '0;0.92;0'}
             dur={duration}
-            begin={`${(index * Number.parseFloat(duration)) / dotCount}s`}
+            begin={`${(pulsing ? index * durationSeconds * 0.16 : (index * durationSeconds) / dotCount).toFixed(2)}s`}
             repeatCount="indefinite"
+            keyTimes={pulsing ? '0;0.18;0.28;0.46;0.7;1' : undefined}
+          />
+          <animate
+            attributeName="r"
+            values={pulsing ? '2.4;4.5;3.2;2.4' : '3.2;4.2;3.2'}
+            dur={duration}
+            begin={`${(pulsing ? index * durationSeconds * 0.16 : (index * durationSeconds) / dotCount).toFixed(2)}s`}
+            repeatCount="indefinite"
+            keyTimes={pulsing ? '0;0.22;0.72;1' : undefined}
           />
         </circle>
       ))}
@@ -321,21 +355,272 @@ const FlowDots = ({
   );
 };
 
-const DuctAirflow = ({ nodePositions }: { nodePositions: Record<string, number> }) => {
-  const supplyTrunkFlow = averageFlow(nodePositions, ['ahu-01', 'BEL-ACT-001', ...supplyBranchIds]);
-  const exhaustTrunkFlow = averageFlow(nodePositions, ['ahu-02', 'BEL-DMP-008', ...exhaustBranchIds]);
+const ThermalParticleStream = ({
+  path,
+  flow,
+  pulsing,
+  color,
+  colorEnd = color,
+  radiusValues,
+  durationScale = 1,
+}: {
+  path: string;
+  flow: number;
+  pulsing: boolean;
+  color: string;
+  colorEnd?: string;
+  radiusValues: string;
+  durationScale?: number;
+}) => {
+  if (flow <= 0) {
+    return null;
+  }
+
+  const durationSeconds = Math.max(4.8, 11 - flow * 6.8) * durationScale;
+  const duration = `${durationSeconds}s`;
+  const particleCount = flow >= 0.8 ? 6 : flow >= 0.45 ? 4 : 2;
+  const burstWindow = pulsing ? durationSeconds * 0.18 : durationSeconds / particleCount;
 
   return (
     <g>
-      <FlowDots d="M 10 567.5 L 840 567.5" flow={supplyTrunkFlow} color={supplyPalette} />
+      {Array.from({ length: particleCount }, (_, index) => {
+        const begin = `${(pulsing ? index * burstWindow : (index * durationSeconds) / particleCount).toFixed(2)}s`;
+        const opacityValues = pulsing ? '0;0;1;0.15;0;0' : '0;1;0.25;0';
+        const opacityTimes = pulsing ? '0;0.18;0.32;0.48;0.68;1' : '0;0.18;0.78;1';
+
+        return (
+          <circle key={`${path}-${index}`} r={3.6} fill={`hsl(${color})`} opacity={0}>
+            <animateMotion dur={duration} begin={begin} repeatCount="indefinite" path={path} rotate="auto" />
+            <animate
+              attributeName="fill"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={`hsl(${color});hsl(${color});hsl(${colorEnd});hsl(${colorEnd})`}
+              keyTimes="0;0.42;0.62;1"
+            />
+            <animate
+              attributeName="opacity"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={opacityValues}
+              keyTimes={opacityTimes}
+            />
+            <animate
+              attributeName="r"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={radiusValues}
+              keyTimes="0;0.2;0.75;1"
+            />
+          </circle>
+        );
+      })}
+    </g>
+  );
+};
+
+const PortBreathing = ({
+  flow,
+  type,
+  pulsing,
+}: {
+  flow: number;
+  type: 'intake' | 'exhaust';
+  pulsing: boolean;
+}) => {
+  if (flow <= 0) {
+    return null;
+  }
+
+  const durationSeconds = Math.max(2.2, 4.4 - flow * 2);
+  const duration = `${durationSeconds}s`;
+  const isIntake = type === 'intake';
+  const cx = isIntake ? 18 : 1172;
+  const cy = isIntake ? 567.5 : 107.5;
+  const stroke = isIntake ? supplyPalette : exhaustPalette;
+  const path = isIntake ? buildIntakePortPath() : buildExhaustPortPath();
+
+  return (
+    <g>
+      {Array.from({ length: 3 }, (_, index) => {
+        const begin = `${(index * durationSeconds) / 3}s`;
+        return (
+          <ellipse
+            key={`${type}-ring-${index}`}
+            cx={cx}
+            cy={cy}
+            rx={isIntake ? 28 : 10}
+            ry={isIntake ? 18 : 7}
+            fill="none"
+            stroke={`hsl(${stroke} / 0.45)`}
+            strokeWidth={1.1}
+            opacity={0}
+          >
+            <animate
+              attributeName="rx"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={isIntake ? '32;18;8' : '10;24;38'}
+            />
+            <animate
+              attributeName="ry"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={isIntake ? '20;11;4' : '7;14;22'}
+            />
+            <animate
+              attributeName="opacity"
+              dur={duration}
+              begin={begin}
+              repeatCount="indefinite"
+              values={pulsing ? '0;0;0.65;0.18;0' : '0;0.65;0.15;0'}
+              keyTimes={pulsing ? '0;0.18;0.32;0.62;1' : undefined}
+            />
+          </ellipse>
+        );
+      })}
+      <ThermalParticleStream
+        path={path}
+        flow={flow}
+        pulsing={pulsing}
+        color={stroke}
+        radiusValues={isIntake ? '2.4;3.8;2.8;2.2' : '2.8;4.4;3.6;2.6'}
+        durationScale={0.72}
+      />
+    </g>
+  );
+};
+
+const ThermodynamicAirflow = ({
+  devices,
+  nodePositions,
+}: {
+  devices: Device[];
+  nodePositions: Record<string, number>;
+}) => {
+  const deviceById = Object.fromEntries(devices.map((device) => [device.id, device]));
+  const intakeFlow = Math.min(nodePositions['ahu-01'] ?? 0, nodePositions['BEL-ACT-001'] ?? 0);
+  const exhaustPortFlow = Math.min(nodePositions['ahu-02'] ?? 0, nodePositions['BEL-DMP-008'] ?? 0);
+  const edgePulsing = isPulsingStatus(deviceById['BEL-ACT-001']?.status) || isPulsingStatus(deviceById['BEL-DMP-008']?.status);
+
+  return (
+    <g>
+      <PortBreathing flow={intakeFlow} type="intake" pulsing={edgePulsing} />
+      <PortBreathing flow={exhaustPortFlow} type="exhaust" pulsing={edgePulsing} />
+      {thermalLanes.map(({ key, supplyId, exhaustId, supplyX, hotX }) => {
+        const routeFlow = Math.min(
+          nodePositions[supplyId] ?? 0,
+          nodePositions[exhaustId] ?? 0,
+          intakeFlow,
+          exhaustPortFlow,
+        );
+        const pulsing = [supplyId, exhaustId].some((id) => {
+          const status = deviceById[id]?.status;
+          return isPulsingStatus(status);
+        });
+
+        return laneHeights.map((laneY) => {
+          const guideKey = `${key}-${laneY}`;
+          const coldPath = buildColdSupplyPath(supplyX, laneY);
+          const crossPath = buildServerPassPath(supplyX, hotX, laneY);
+          const hotPath = buildHotRisePath(hotX, laneY);
+          return (
+            <g key={guideKey}>
+              <path
+                d={coldPath}
+                stroke={`hsl(${supplyPalette} / 0.1)`}
+                strokeWidth={5}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d={crossPath}
+                stroke={`hsl(${supplyPalette} / 0.09)`}
+                strokeWidth={4}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <path
+                d={hotPath}
+                stroke={`hsl(${exhaustPalette} / 0.1)`}
+                strokeWidth={5}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <ThermalParticleStream
+                path={coldPath}
+                flow={routeFlow}
+                pulsing={pulsing}
+                color={supplyPalette}
+                radiusValues="2.2;3.4;2.8;2.2"
+                durationScale={0.9}
+              />
+              <ThermalParticleStream
+                path={crossPath}
+                flow={routeFlow * 0.92}
+                pulsing={pulsing}
+                color={supplyPalette}
+                colorEnd={exhaustPalette}
+                radiusValues="2.4;3.6;3.4;2.5"
+                durationScale={1.05}
+              />
+              <ThermalParticleStream
+                path={hotPath}
+                flow={routeFlow * 0.88}
+                pulsing={pulsing}
+                color={exhaustPalette}
+                radiusValues="3.1;4.8;4.2;3"
+                durationScale={1.28}
+              />
+            </g>
+          );
+        });
+      })}
+    </g>
+  );
+};
+
+const DuctAirflow = ({
+  devices,
+  nodePositions,
+}: {
+  devices: Device[];
+  nodePositions: Record<string, number>;
+}) => {
+  const deviceById = Object.fromEntries(devices.map((device) => [device.id, device]));
+  const supplyTrunkFlow = averageFlow(nodePositions, ['ahu-01', 'BEL-ACT-001', ...supplyBranchIds]);
+  const exhaustTrunkFlow = averageFlow(nodePositions, ['ahu-02', 'BEL-DMP-008', ...exhaustBranchIds]);
+  const supplyPulsing = isPulsingStatus(deviceById['BEL-ACT-001']?.status);
+  const exhaustPulsing = isPulsingStatus(deviceById['BEL-DMP-008']?.status);
+
+  return (
+    <g>
+      <FlowDots d="M 10 567.5 L 840 567.5" flow={supplyTrunkFlow} color={supplyPalette} pulsing={supplyPulsing} />
       {supplyFlowPaths.map(({ id, d }) => (
-        <FlowDots key={id} d={d} flow={nodePositions[id] ?? 0} color={supplyPalette} />
+        <FlowDots
+          key={id}
+          d={d}
+          flow={nodePositions[id] ?? 0}
+          color={supplyPalette}
+          pulsing={isPulsingStatus(deviceById[id]?.status)}
+        />
       ))}
 
       {exhaustFlowPaths.map(({ id, d }) => (
-        <FlowDots key={id} d={d} flow={nodePositions[id] ?? 0} color={exhaustPalette} />
+        <FlowDots
+          key={id}
+          d={d}
+          flow={nodePositions[id] ?? 0}
+          color={exhaustPalette}
+          pulsing={isPulsingStatus(deviceById[id]?.status)}
+        />
       ))}
-      <FlowDots d="M 300 107.5 L 1170 107.5" flow={exhaustTrunkFlow} color={exhaustPalette} />
+      <FlowDots d="M 300 107.5 L 1170 107.5" flow={exhaustTrunkFlow} color={exhaustPalette} pulsing={exhaustPulsing} />
     </g>
   );
 };
@@ -756,7 +1041,7 @@ export default function DatacenterMap({
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
-          className="border border-border bg-card overflow-hidden flex-1 relative touch-none"
+          className="overflow-hidden flex-1 relative touch-none bg-transparent"
           ref={containerRef}
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
         >
@@ -909,7 +1194,8 @@ export default function DatacenterMap({
           >
             <DatacenterBase />
             {simulationStep !== null && <ThermalOverlay rowTemperatures={rowTemperatures} />}
-            <DuctAirflow nodePositions={displayNodePositions} />
+            <DuctAirflow devices={displayDevices} nodePositions={displayNodePositions} />
+            <ThermodynamicAirflow devices={displayDevices} nodePositions={displayNodePositions} />
             {displayDevices.map((device) => (
               <DeviceNode
                 key={device.id}
