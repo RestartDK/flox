@@ -10,7 +10,7 @@ Model selection is intentionally staged across simple tabular baselines and sequ
 
 ## Inference API
 
-The ML inference service provides REST endpoints for three model types:
+The ML inference service provides REST endpoints for multiple model types including XGBoost (default), PyTorch MLP, Conv1D classifier, and autoencoder.
 
 ### Available Endpoints
 
@@ -28,11 +28,17 @@ GET /model/info
 
 Returns information about the currently loaded model including type, task, class names, and feature names.
 
-#### MLP Classifier
-```bash
-POST /predict/mlp
-Content-Type: application/json
+#### Tabular Classifiers (XGBoost / MLP / LogReg)
 
+**Make prediction:**
+```bash
+curl -X POST http://localhost:8200/predict/mlp \
+  -H 'Content-Type: application/json' \
+  -d '{"features": [50.0, 2.5, 45.0, 55.0, 5.0, ...]}'
+```
+
+**Example request body** (57 features):
+```json
 {
   "features": [
     50.0, 2.5, 45.0, 55.0, 5.0,
@@ -51,18 +57,18 @@ Content-Type: application/json
 }
 ```
 
-Response:
+Response (XGBoost - default):
 ```json
 {
-  "model_type": "mlp_classifier",
+  "model_type": "xgboost",
   "task": "multiclass",
   "prediction": 1,
-  "probabilities": [0.0, 1.0, 0.0, 0.0, 0.0],
+  "probabilities": [0.220, 0.598, 0.173, 0.0002, 0.009],
   "class_name": "Valve Destabilization (Repeated Poking)"
 }
 ```
 
-The MLP classifier expects 57 features representing aggregated statistics from time series windows. See model info endpoint for complete feature names.
+The tabular classifier endpoints accept 57 features representing aggregated statistics from time series windows. Supported model types: `xgboost` (default), `mlp_classifier`, `logreg`. The endpoint automatically handles the loaded model type.
 
 #### Conv1D Classifier
 ```bash
@@ -125,7 +131,12 @@ The service will be available at `http://localhost:8200`
 
 #### Testing
 ```bash
-python ml/test_inference.py
+# Run all inference tests
+cd ml
+python -m pytest tests/test_inference.py -v
+
+# Or run specific test
+python -m pytest tests/test_inference.py::test_health -v
 ```
 
 ### API Documentation

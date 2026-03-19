@@ -17,30 +17,90 @@ from models.arch import Model
 class MLPClassifierInput(BaseModel):
     features: list[float] = Field(
         ...,
-        description="Input features for MLP classifier",
-        min_length=1,
+        description=(
+            "57 tabular features representing aggregated actuator sensor statistics: "
+            "feedback_position (5), setpoint_position (5), position_error (5), "
+            "motor_torque (5), power (5), internal_temperature (5), "
+            "pipe_air_flow (5), pipe_air_temperature (5), pipe_air_flow_ema (5), "
+            "pipe_air_temperature_ema (5), rotation_direction (2), velocity (5)"
+        ),
+        min_length=57,
+        max_length=57,
     )
 
     class Config:
         json_schema_extra = {
             "example": {
                 "features": [
-                    0.5,
-                    -0.3,
-                    1.2,
-                    0.8,
-                    -0.1,
-                    0.4,
-                    0.9,
-                    -0.5,
-                    0.2,
-                    0.7,
-                    -0.4,
-                    0.3,
-                    0.6,
-                    -0.2,
+                    # feedback_position_% (mean, std, min, max, last-first)
+                    50.0,
+                    2.5,
+                    45.0,
+                    55.0,
+                    5.0,
+                    # setpoint_position_% (mean, std, min, max, last-first)
+                    50.0,
                     0.1,
+                    50.0,
+                    50.0,
                     0.0,
+                    # position_error_pct (mean, std, min, max, last-first)
+                    0.5,
+                    2.0,
+                    -2.0,
+                    3.0,
+                    1.0,
+                    # motor_torque_Nmm (mean, std, min, max, last-first)
+                    150.0,
+                    20.0,
+                    100.0,
+                    200.0,
+                    50.0,
+                    # power_W (mean, std, min, max, last-first)
+                    5.0,
+                    1.0,
+                    3.0,
+                    7.0,
+                    2.0,
+                    # internal_temperature_deg_C (mean, std, min, max, last-first)
+                    40.0,
+                    2.0,
+                    36.0,
+                    44.0,
+                    3.0,
+                    # pipe_air_flow_Lpm (mean, std, min, max, last-first)
+                    100.0,
+                    15.0,
+                    80.0,
+                    120.0,
+                    20.0,
+                    # pipe_air_temperature_deg_C (mean, std, min, max, last-first)
+                    25.0,
+                    1.5,
+                    22.0,
+                    28.0,
+                    2.0,
+                    # pipe_air_flow_ema_8 (mean, std, min, max, last-first)
+                    95.0,
+                    12.0,
+                    75.0,
+                    115.0,
+                    18.0,
+                    # pipe_air_temperature_ema_8 (mean, std, min, max, last-first)
+                    24.0,
+                    1.2,
+                    21.0,
+                    27.0,
+                    1.5,
+                    # rotation_direction (mode, change_count)
+                    1.0,
+                    2.0,
+                    # velocity_pct_per_s (mean, std, min, max, last-first)
+                    10.0,
+                    5.0,
+                    0.0,
+                    20.0,
+                    8.0,
                 ]
             }
         }
@@ -175,6 +235,17 @@ def load_checkpoint() -> None:
         # XGBoost and Logistic Regression models
         xgboost_model = checkpoint["model"]
         imputer = checkpoint["imputer"]
+
+        # Fix sklearn compatibility for older pickled models
+        if not hasattr(imputer, "_fit_dtype"):
+            imputer._fit_dtype = np.dtype("float64")
+        if not hasattr(imputer, "_fill_dtype"):
+            imputer._fill_dtype = np.dtype("float64")
+        if not hasattr(imputer, "n_features_in_"):
+            imputer.n_features_in_ = len(imputer.statistics_)
+        if not hasattr(imputer, "indicator_"):
+            imputer.indicator_ = None
+
         print(f"Loaded {model_type} model for {task} task")
 
     elif model_type == "mlp_classifier":
@@ -237,27 +308,77 @@ def health_check() -> dict[str, str]:
 
 @app.get("/model/info")
 def model_info() -> dict[str, Any]:
-    if checkpoint is None or model is None:
+    if checkpoint is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
+
+    # For XGBoost/LogReg models, we don't have feature names in the checkpoint
+    # but we can infer from the training data
+    feature_names = checkpoint.get("feature_names", [])
+    if not feature_names and imputer is not None:
+        # Generate generic feature names based on imputer
+        n_features = len(imputer.statistics_)
+        feature_names = [f"feature_{i}" for i in range(n_features)]
 
     return {
         "model_type": checkpoint["model_type"],
         "task": checkpoint.get("task", "unknown"),
         "checkpoint_path": str(checkpoint_path),
         "class_names": checkpoint.get("class_names", []),
-        "feature_names": checkpoint.get("feature_names", []),
+        "feature_names": feature_names,
     }
 
 
 @app.post("/predict/mlp", response_model=PredictionResponse)
 def predict_mlp(data: MLPClassifierInput) -> PredictionResponse:
-    if checkpoint is None or model is None:
+    if checkpoint is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
-    if checkpoint["model_type"] != "mlp_classifier":
+    model_type = checkpoint["model_type"]
+
+    # Support both PyTorch MLP and sklearn models (XGBoost, LogReg)
+    if model_type in ("xgboost", "logreg", "mlp_classifier"):
+        if imputer is None:
+            raise HTTPException(status_code=503, detail="Preprocessors not loaded")
+
+        features = np.array(data.features).reshape(1, -1)
+        features = imputer.transform(features)
+
+        if model_type == "mlp_classifier":
+            # PyTorch MLP
+            if model is None or scaler is None:
+                raise HTTPException(
+                    status_code=503, detail="Model or scaler not loaded"
+                )
+
+            features = scaler.transform(features)
+            features_tensor = torch.tensor(features, dtype=torch.float32)
+
+            with torch.no_grad():
+                logits = model(features_tensor)
+                probabilities = torch.softmax(logits, dim=1).squeeze(0).tolist()
+                prediction = int(torch.argmax(logits, dim=1).item())
+        else:
+            # XGBoost or LogReg
+            if xgboost_model is None:
+                raise HTTPException(status_code=503, detail="Model not loaded")
+
+            probabilities = xgboost_model.predict_proba(features)[0].tolist()
+            prediction = int(xgboost_model.predict(features)[0])
+
+        class_names = checkpoint.get("class_names", [])
+        class_name = class_names[prediction] if prediction < len(class_names) else None
+
+        return PredictionResponse(
+            model_type=model_type,
+            task=checkpoint.get("task", "unknown"),
+            prediction=prediction,
+            probabilities=probabilities,
+            class_name=class_name,
+        )
+    else:
         raise HTTPException(
             status_code=400,
-            detail=f"Loaded model is {checkpoint['model_type']}, expected mlp_classifier",
+            detail=f"Loaded model is {model_type}, expected mlp_classifier, xgboost, or logreg",
         )
 
     if imputer is None or scaler is None:
