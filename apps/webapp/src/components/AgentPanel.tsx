@@ -3,9 +3,9 @@ import { Bot, Check, Clock3, Loader2, Send, ShieldAlert, Thermometer, X, Zap } f
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { type AgentChatMessage, type AgentToolEvent, type AgentPendingAction, type Device, type TelemetryPoint } from '@/data/mockDevices';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { type AgentChatMessage, type AgentPendingAction, type AgentToolEvent, type Device, type TelemetryPoint } from '@/types/facility';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useResolveFault } from '@/hooks/useFacilityData';
 

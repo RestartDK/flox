@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type Device, type Fault } from '@/data/mockDevices';
+import { type Device, type Fault } from '@/types/facility';
 import { useResolveFault } from '@/hooks/useFacilityData';
 import { Zap, Check, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';

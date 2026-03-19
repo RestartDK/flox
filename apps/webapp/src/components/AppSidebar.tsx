@@ -1,4 +1,4 @@
-import { type BuildingStats } from '@/data/mockDevices';
+import { type BuildingStats } from '@/types/facility';
 import { AlertTriangle, Bot, Map, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
