@@ -53,6 +53,7 @@ services:
       - "8200:8000"
     environment:
       - ML_LATEST_WEIGHTS_PATH=/app/ml/models/weights
+      - ML_MODEL_FILE=${ML_MODEL_FILE:-}
       - PYTHONPATH=/app
     volumes:
       - ./ml/models:/app/ml/models
