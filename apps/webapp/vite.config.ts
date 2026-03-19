@@ -3,10 +3,17 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const DEFAULT_PRODUCTION_BACKEND_URL =
+  "https://starthack26-backend-production.up.railway.app";
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const backendTarget = env.VITE_BACKEND_URL || "http://127.0.0.1:5000";
+  const backendTarget =
+    env.VITE_BACKEND_URL ||
+    (mode === "production"
+      ? DEFAULT_PRODUCTION_BACKEND_URL
+      : "http://127.0.0.1:5000");
 
   return {
     server: {
