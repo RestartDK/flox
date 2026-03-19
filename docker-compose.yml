@@ -87,6 +87,21 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  node-simulator:
+    container_name: "${NAME}-node-simulator"
+    profiles: ["sim"]
+    build:
+      context: ./
+      dockerfile: ./docker/simulator.Dockerfile
+    environment:
+      - SIM_BACKEND_URL=http://backend-fastapi:5000
+      - SIM_NODE_ID=${SIM_NODE_ID:-BEL-VLV-003}
+      - SIM_SPEED=${SIM_SPEED:-1.0}
+      - SIM_LOOP=${SIM_LOOP:-1}
+    depends_on:
+      - backend-fastapi
+    restart: unless-stopped
+
   minio:
     image: minio/minio:latest
     container_name: "${NAME}-minio"
