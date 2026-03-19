@@ -90,33 +90,57 @@ flowchart TD
 
 ## Repository layout
 
-```
-apps/
-  webapp/             Vite + React + Tailwind — facility map, issues dashboard,
-                      device telemetry charts, AI agent panel
-  backend/
-    fastapi/          REST API — telemetry ingest, status, fault resolution,
-                      agent chat, document upload
-  worker/             Celery beat worker — runs the classification loop
-
-ml/
-  models/             Model architecture and training loop
-  data/               ETL pipeline and processed artifacts
-  inference.py        FastAPI ML inference server (optional profile)
-  configs/            YAML hyperparameter configs
-
-shacklib/
-  diagnosis_engine.py Fault classification, state management, payload builders
-  agent.py            Claude integration (ask / stream / Agent)
-  backend_state.py    Postgres read/write with relational + legacy JSONB sync
-  node_simulator.py   Actuator signal simulator for development and testing
-  mock_facility.py    Seed data — zones, AHU units, device templates
-  logger.py           Structured JSON logger with optional Loki push
-  scraper.py          Web scraper utility
-
-database/             SQL init files (auto-run by Postgres on first start)
-docker/               Per-service Dockerfiles
-scripts/              Utility scripts (seed, migration helpers)
+```mermaid
+mindmap
+  root((Flox))
+    apps
+      webapp
+        Facility map
+        Issues dashboard
+        Device telemetry charts
+        AI agent panel
+      backend
+        fastapi
+          Telemetry ingest
+          Status endpoint
+          Fault resolution
+          Agent chat
+          Document upload
+      worker
+        Celery beat
+        Classification loop
+    ml
+      models
+        Architecture
+        Training loop
+      data
+        ETL pipeline
+        Processed artifacts
+      inference.py
+        ML inference server
+      configs
+        Hyperparameter YAML
+    shacklib
+      diagnosis_engine.py
+        Fault classification
+        State management
+        Payload builders
+      agent.py
+        Claude integration
+      backend_state.py
+        Postgres read/write
+      node_simulator.py
+        Actuator signal simulator
+      mock_facility.py
+        Seed data
+      logger.py
+        Structured JSON logging
+    database
+      SQL init files
+    docker
+      Per-service Dockerfiles
+    scripts
+      Seed and migration helpers
 ```
 
 
