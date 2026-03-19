@@ -42,13 +42,13 @@ Flox closes that gap:
 
 ## Fault types detected
 
-| Kind | Condition | Severity |
-|---|---|---|
-| `stiction_suspected` | Torque >= 22 Nm on an actuator | Critical |
-| `high_torque_anomaly` | Torque >= 16 Nm | Warning |
-| `temperature_drift` | Internal temperature >= 52 °C | Warning |
-| `signal_loss` | Control signal <= 0.2 | Critical |
-| `weak_signal` | Control signal <= 0.45 | Warning |
+| Kind | Severity |
+|---|---|
+| `stiction_suspected` | Critical |
+| `high_torque_anomaly` | Warning |
+| `temperature_drift` | Warning |
+| `signal_loss` | Critical |
+| `weak_signal` | Warning |
 
 ML-based classifiers (when enabled) extend coverage beyond rule thresholds.
 
@@ -72,23 +72,19 @@ make help                 # list all targets
 
 ## Data pipeline
 
-```
-Actuator  →  POST /api/ingest        (FastAPI)
-              ↓
-          ingest_node()              (shacklib/diagnosis_engine.py)
-              writes telemetry history + latest values to Postgres
-              ↓
-          Celery beat (classifier)   (apps/worker/)
-              runs run_diagnosis_cycle() every N seconds
-              applies heuristic classifier per node
-              attaches / updates / resolves faults
-              propagates status up the node tree
-              ↓
-          GET /api/status            (FastAPI)
-              reconstructs full facility payload from Postgres
-              ↓
-          React dashboard            (apps/webapp/)
-              map view + issues panel + device telemetry charts
+```mermaid
+flowchart TD
+    A([Actuator]) -->|telemetry stream| B[POST /api/ingest\nFastAPI]
+    B --> C[(PostgreSQL\ntelemetry history\n+ latest values)]
+    C --> D[Celery beat worker\nrun_diagnosis_cycle]
+    D -->|heuristic + ML classifier| E{Fault?}
+    E -->|yes| F[Attach / update fault\nset node status]
+    E -->|no| G[Clear fault\nmark healthy]
+    F --> H[Propagate status\nup node hierarchy]
+    G --> H
+    H --> C
+    C --> I[GET /api/status\nFastAPI]
+    I --> J[React dashboard\nmap · issues · telemetry charts]
 ```
 
 
