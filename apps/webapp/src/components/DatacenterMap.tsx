@@ -638,6 +638,13 @@ export default function DatacenterMap({
     ? Math.round((simulationResult.bayesian.summary.cpu_probability_delta ?? 0) * 100)
     : 0;
   const bayesianDrivers = simulationResult?.bayesian.summary.key_drivers ?? [];
+  const bayesianExplainability = simulationResult?.bayesian.explainability ?? null;
+  const serviceExplain = bayesianExplainability?.serviceRisk;
+  const cpuExplain = bayesianExplainability?.cpuRisk;
+  const discoveryClaim = simulationResult?.discovery.discoveryClaim ?? null;
+  const counterintuitiveFinding = simulationResult?.discovery.counterintuitiveFinding ?? null;
+  const significanceScore = simulationResult?.discovery.significanceScore ?? null;
+  const discoveryEvidence = simulationResult?.discovery.evidence ?? [];
 
   const startSimulation = async () => {
     setSimulationError(null);
@@ -787,17 +794,64 @@ export default function DatacenterMap({
                 />
               </div>
               <div className="mt-2 text-[10px] text-muted-foreground leading-tight">
-                Discovery signal: local Row F hot aisle +{localRiseC.toFixed(1)}C and cross-zone hot aisle rise +{crossZoneRiseC.toFixed(1)}C.
+                Thermal signal: local Row F hot aisle +{localRiseC.toFixed(1)}C and cross-zone hot aisle rise +{crossZoneRiseC.toFixed(1)}C.
               </div>
               {simulationResult && (
                 <>
+                  {discoveryClaim && (
+                    <div className="mt-1 text-[10px] leading-tight text-foreground/90">
+                      Discovery claim: {discoveryClaim}
+                    </div>
+                  )}
+                  {counterintuitiveFinding && (
+                    <div className="mt-1 text-[10px] leading-tight text-[hsl(var(--status-warning))]">
+                      Counterintuitive: {counterintuitiveFinding}
+                    </div>
+                  )}
+                  {typeof significanceScore === 'number' && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Significance score: {significanceScore.toFixed(1)} / 100
+                      {typeof simulationResult.discovery.pValue === 'number' && (
+                        <span>{` · p=${simulationResult.discovery.pValue.toFixed(4)}`}</span>
+                      )}
+                      {typeof simulationResult.discovery.effectSize === 'number' && (
+                        <span>{` · effect=${simulationResult.discovery.effectSize.toFixed(2)}`}</span>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
                     Bayesian impact: service risk {serviceBaselinePercent}% to {serviceRiskPercent}% ({serviceDeltaPercent >= 0 ? '+' : ''}{serviceDeltaPercent}pp),
                     CPU throttling risk {cpuBaselinePercent}% to {cpuRiskPercent}% ({cpuDeltaPercent >= 0 ? '+' : ''}{cpuDeltaPercent}pp).
                   </div>
+                  {serviceExplain && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Why service risk changed: {serviceExplain.interpretation}
+                    </div>
+                  )}
+                  {serviceExplain?.topContributors?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Top contributor: {serviceExplain.topContributors[0].sourceLabel} (
+                      {Math.round(serviceExplain.topContributors[0].baselineContribution * 100)}% to {Math.round(serviceExplain.topContributors[0].candidateContribution * 100)}% weighted influence).
+                    </div>
+                  )}
+                  {serviceExplain?.strongestPaths?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Strongest path: {serviceExplain.strongestPaths[0].path} (score {serviceExplain.strongestPaths[0].score.toFixed(2)}).
+                    </div>
+                  )}
+                  {cpuExplain?.strongestPaths?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      CPU path support: {cpuExplain.strongestPaths[0].path} (score {cpuExplain.strongestPaths[0].score.toFixed(2)}).
+                    </div>
+                  )}
                   <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
                     Most at-risk zone: {simulationResult.bayesian.summary.most_at_risk_zone.replace('_', ' ')}.
                   </div>
+                  {discoveryEvidence.length > 0 && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Evidence: {counterintuitiveFinding ? (discoveryEvidence[1] ?? discoveryEvidence[0]) : discoveryEvidence[0]}
+                    </div>
+                  )}
                   {bayesianDrivers.length > 0 && (
                     <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
                       Key drivers: {bayesianDrivers.join(', ')}

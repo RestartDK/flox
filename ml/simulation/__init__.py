@@ -1,4 +1,5 @@
 from ml.simulation.engine import SimulationEngine, SimulationResult
+from ml.simulation.discovery import run_discovery_analysis
 from ml.simulation.scenarios import (
     ScenarioDefinition,
     build_default_engine,
@@ -26,5 +27,6 @@ __all__ = [
     "clone_state",
     "default_scenarios",
     "discovery_report",
+    "run_discovery_analysis",
     "run_scenario",
 ]

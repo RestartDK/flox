@@ -345,11 +345,43 @@ class BayesianSummaryView(BaseModel):
     key_drivers: list[str] = Field(default_factory=list)
 
 
+class BayesianContributionView(BaseModel):
+    sourceId: str
+    sourceLabel: str
+    baselineContribution: float
+    candidateContribution: float
+    deltaContribution: float
+
+
+class BayesianPathView(BaseModel):
+    path: str
+    score: float
+
+
+class BayesianRiskExplanationView(BaseModel):
+    targetId: str
+    targetLabel: str
+    baselineProbability: float
+    candidateProbability: float
+    deltaProbability: float
+    topContributors: list[BayesianContributionView] = Field(default_factory=list)
+    strongestPaths: list[BayesianPathView] = Field(default_factory=list)
+    interpretation: str
+
+
+class BayesianExplainabilityView(BaseModel):
+    method: str
+    simulationEvidence: dict[str, float] = Field(default_factory=dict)
+    cpuRisk: BayesianRiskExplanationView
+    serviceRisk: BayesianRiskExplanationView
+
+
 class BayesianView(BaseModel):
     nodes: list[BayesianNodeView]
     edges: list[BayesianEdgeView]
     topRisks: list[BayesianRiskView]
     summary: BayesianSummaryView
+    explainability: BayesianExplainabilityView | None = None
 
 
 class DiscoveryView(BaseModel):
@@ -367,6 +399,17 @@ class DiscoveryView(BaseModel):
     time_to_first_throttle_candidate_s: float | None = None
     time_to_first_shutdown_baseline_s: float | None = None
     time_to_first_shutdown_candidate_s: float | None = None
+    discoveryClaim: str | None = None
+    counterintuitiveFinding: str | None = None
+    significanceScore: float | None = None
+    pValue: float | None = None
+    effectSize: float | None = None
+    confidenceIntervalC: list[float] = Field(default_factory=list)
+    primaryImpactZone: str | None = None
+    nonLocalImpactC: float | None = None
+    compoundHotspotZone: str | None = None
+    compoundHotspotRate: float | None = None
+    evidence: list[str] = Field(default_factory=list)
 
 
 class SimulationRunResponse(BaseModel):

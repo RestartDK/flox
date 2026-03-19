@@ -12,7 +12,9 @@ from ml.simulation import (
     build_datacenter_topology,
     build_default_engine,
     build_initial_state,
+    clone_state,
     discovery_report,
+    run_discovery_analysis,
 )
 
 
@@ -49,8 +51,9 @@ def run_simulation_bundle(
     failure_events = [_to_failure_event(item) for item in effective_failures]
 
     topology = build_datacenter_topology()
-    baseline_state = build_initial_state(topology, dt_s=dt_seconds)
-    candidate_state = build_initial_state(topology, dt_s=dt_seconds)
+    warm_state = _build_warm_state(topology=topology, dt_seconds=dt_seconds)
+    baseline_state = clone_state(warm_state)
+    candidate_state = clone_state(warm_state)
 
     baseline_engine = build_default_engine(topology)
     candidate_engine = build_default_engine(topology)
@@ -68,6 +71,13 @@ def run_simulation_bundle(
     )
 
     discovery = discovery_report(baseline_result, candidate_result)
+    advanced_discovery = run_discovery_analysis(
+        duration_seconds=duration_seconds,
+        dt_seconds=dt_seconds,
+        candidate_failures=failure_events,
+        trials=8,
+    )
+    discovery.update(advanced_discovery)
     simulation_context = _build_simulation_context(discovery)
     candidate_component_priors = build_component_failure_priors(
         requested_failures=effective_failures,
@@ -89,6 +99,11 @@ def run_simulation_bundle(
     bayesian["summary"] = _build_bayesian_summary_with_delta(
         baseline_serialized=serialize_bayesian_result(baseline_bayesian_result),
         candidate_serialized=bayesian,
+    )
+    bayesian["explainability"] = _build_bayesian_explainability(
+        baseline_serialized=serialize_bayesian_result(baseline_bayesian_result),
+        candidate_serialized=bayesian,
+        simulation_context=simulation_context,
     )
 
     status_node_positions = _extract_status_node_positions(status_payload)
@@ -134,6 +149,20 @@ def run_simulation_bundle(
     }
 
 
+def _build_warm_state(*, topology, dt_seconds: float):
+    state = build_initial_state(topology, dt_s=dt_seconds)
+    engine = build_default_engine(topology)
+    warmup_seconds = 60.0
+    warmup_steps = max(1, int(round(warmup_seconds / dt_seconds)))
+    for _ in range(warmup_steps):
+        state = engine.step(state)
+    state.time_s = 0.0
+    state.history.clear()
+    state.events.clear()
+    state.active_failures = []
+    return state
+
+
 def _build_bayesian_summary_with_delta(
     *,
     baseline_serialized: dict[str, Any],
@@ -173,6 +202,197 @@ def _build_bayesian_summary_with_delta(
         "service_probability_delta": round(candidate_service - baseline_service, 4),
         "key_drivers": key_drivers,
     }
+
+
+def _build_bayesian_explainability(
+    *,
+    baseline_serialized: dict[str, Any],
+    candidate_serialized: dict[str, Any],
+    simulation_context: dict[str, float],
+) -> dict[str, Any]:
+    baseline_nodes = _node_prob_lookup(baseline_serialized)
+    candidate_nodes = _node_prob_lookup(candidate_serialized)
+    node_labels = _node_label_lookup(candidate_serialized)
+    edges = candidate_serialized.get("edges")
+    edges_list = edges if isinstance(edges, list) else []
+
+    cpu_expl = _build_risk_explanation(
+        target_id="r_cpu",
+        baseline_nodes=baseline_nodes,
+        candidate_nodes=candidate_nodes,
+        node_labels=node_labels,
+        edges=edges_list,
+    )
+    service_expl = _build_risk_explanation(
+        target_id="r_service",
+        baseline_nodes=baseline_nodes,
+        candidate_nodes=candidate_nodes,
+        node_labels=node_labels,
+        edges=edges_list,
+    )
+
+    return {
+        "method": "Noisy-OR Bayesian network with simulation-informed posterior blending",
+        "simulationEvidence": {
+            "candidate_cpu_peak_c": round(
+                float(simulation_context.get("candidate_cpu_peak_c", 0.0)), 3
+            ),
+            "baseline_cpu_peak_c": round(
+                float(simulation_context.get("baseline_cpu_peak_c", 0.0)), 3
+            ),
+            "max_zone_peak_delta_c": round(
+                float(simulation_context.get("max_zone_peak_delta_c", 0.0)), 3
+            ),
+        },
+        "cpuRisk": cpu_expl,
+        "serviceRisk": service_expl,
+    }
+
+
+def _build_risk_explanation(
+    *,
+    target_id: str,
+    baseline_nodes: dict[str, float],
+    candidate_nodes: dict[str, float],
+    node_labels: dict[str, str],
+    edges: list[dict[str, Any]],
+) -> dict[str, Any]:
+    incoming = [edge for edge in edges if str(edge.get("target")) == target_id]
+    contributors: list[dict[str, Any]] = []
+    for edge in incoming:
+        source = str(edge.get("source") or "")
+        if not source:
+            continue
+        weight = float(edge.get("weight") or 0.0)
+        base_parent = baseline_nodes.get(source, 0.0)
+        cand_parent = candidate_nodes.get(source, 0.0)
+        base_contrib = base_parent * weight
+        cand_contrib = cand_parent * weight
+        contributors.append(
+            {
+                "sourceId": source,
+                "sourceLabel": node_labels.get(source, source),
+                "baselineContribution": round(base_contrib, 4),
+                "candidateContribution": round(cand_contrib, 4),
+                "deltaContribution": round(cand_contrib - base_contrib, 4),
+            }
+        )
+    contributors.sort(key=lambda item: item["deltaContribution"], reverse=True)
+
+    strongest_paths = _build_strongest_paths(
+        target_id=target_id,
+        candidate_nodes=candidate_nodes,
+        node_labels=node_labels,
+        edges=edges,
+    )
+
+    baseline_p = baseline_nodes.get(target_id, 0.0)
+    candidate_p = candidate_nodes.get(target_id, 0.0)
+    delta = candidate_p - baseline_p
+    interpretation = (
+        f"{node_labels.get(target_id, target_id)} rose by {round(delta * 100, 1)}pp "
+        f"({round(baseline_p * 100, 1)}% -> {round(candidate_p * 100, 1)}%)."
+    )
+
+    return {
+        "targetId": target_id,
+        "targetLabel": node_labels.get(target_id, target_id),
+        "baselineProbability": round(baseline_p, 4),
+        "candidateProbability": round(candidate_p, 4),
+        "deltaProbability": round(delta, 4),
+        "topContributors": contributors[:3],
+        "strongestPaths": strongest_paths,
+        "interpretation": interpretation,
+    }
+
+
+def _build_strongest_paths(
+    *,
+    target_id: str,
+    candidate_nodes: dict[str, float],
+    node_labels: dict[str, str],
+    edges: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    # For explainability, compute compact two-hop path scores.
+    if target_id == "r_service":
+        # Service is driven by CPU node in this graph.
+        cpu_prob = candidate_nodes.get("r_cpu", 0.0)
+        cpu_to_service_weight = _edge_weight(edges, "r_cpu", "r_service")
+        cpu_path = {
+            "path": f"{node_labels.get('r_cpu', 'r_cpu')} -> {node_labels.get('r_service', 'r_service')}",
+            "score": round(cpu_prob * cpu_to_service_weight, 4),
+        }
+        zone_paths = []
+        for zone_node in ["r_zone_ab", "r_zone_cd", "r_zone_ef"]:
+            score = (
+                candidate_nodes.get(zone_node, 0.0)
+                * _edge_weight(edges, zone_node, "r_cpu")
+                * cpu_to_service_weight
+            )
+            zone_paths.append(
+                {
+                    "path": (
+                        f"{node_labels.get(zone_node, zone_node)} -> "
+                        f"{node_labels.get('r_cpu', 'r_cpu')} -> "
+                        f"{node_labels.get('r_service', 'r_service')}"
+                    ),
+                    "score": round(score, 4),
+                }
+            )
+        zone_paths.sort(key=lambda item: item["score"], reverse=True)
+        return [cpu_path, *zone_paths[:2]]
+
+    # target r_cpu: show top zone -> cpu paths
+    zone_paths = []
+    for zone_node in ["r_zone_ab", "r_zone_cd", "r_zone_ef"]:
+        score = candidate_nodes.get(zone_node, 0.0) * _edge_weight(
+            edges, zone_node, "r_cpu"
+        )
+        zone_paths.append(
+            {
+                "path": f"{node_labels.get(zone_node, zone_node)} -> {node_labels.get('r_cpu', 'r_cpu')}",
+                "score": round(score, 4),
+            }
+        )
+    zone_paths.sort(key=lambda item: item["score"], reverse=True)
+    return zone_paths[:3]
+
+
+def _edge_weight(edges: list[dict[str, Any]], source: str, target: str) -> float:
+    for edge in edges:
+        if str(edge.get("source")) == source and str(edge.get("target")) == target:
+            return float(edge.get("weight") or 0.0)
+    return 0.0
+
+
+def _node_prob_lookup(serialized: dict[str, Any]) -> dict[str, float]:
+    nodes = serialized.get("nodes")
+    if not isinstance(nodes, list):
+        return {}
+    result: dict[str, float] = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        result[node_id] = float(node.get("probability") or 0.0)
+    return result
+
+
+def _node_label_lookup(serialized: dict[str, Any]) -> dict[str, str]:
+    nodes = serialized.get("nodes")
+    if not isinstance(nodes, list):
+        return {}
+    result: dict[str, str] = {}
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        result[node_id] = str(node.get("label") or node_id)
+    return result
 
 
 def _to_failure_event(payload: dict[str, Any]) -> FailureEvent:

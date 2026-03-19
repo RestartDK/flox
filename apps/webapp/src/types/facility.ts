@@ -290,11 +290,43 @@ export interface BayesianSummary {
   key_drivers: string[];
 }
 
+export interface BayesianContribution {
+  sourceId: string;
+  sourceLabel: string;
+  baselineContribution: number;
+  candidateContribution: number;
+  deltaContribution: number;
+}
+
+export interface BayesianPath {
+  path: string;
+  score: number;
+}
+
+export interface BayesianRiskExplanation {
+  targetId: string;
+  targetLabel: string;
+  baselineProbability: number;
+  candidateProbability: number;
+  deltaProbability: number;
+  topContributors: BayesianContribution[];
+  strongestPaths: BayesianPath[];
+  interpretation: string;
+}
+
+export interface BayesianExplainability {
+  method: string;
+  simulationEvidence: Record<string, number>;
+  cpuRisk: BayesianRiskExplanation;
+  serviceRisk: BayesianRiskExplanation;
+}
+
 export interface BayesianView {
   nodes: BayesianNode[];
   edges: BayesianEdge[];
   topRisks: BayesianRisk[];
   summary: BayesianSummary;
+  explainability?: BayesianExplainability | null;
 }
 
 export interface SimulationDiscovery {
@@ -312,6 +344,17 @@ export interface SimulationDiscovery {
   time_to_first_throttle_candidate_s: number | null;
   time_to_first_shutdown_baseline_s: number | null;
   time_to_first_shutdown_candidate_s: number | null;
+  discoveryClaim?: string | null;
+  counterintuitiveFinding?: string | null;
+  significanceScore?: number | null;
+  pValue?: number | null;
+  effectSize?: number | null;
+  confidenceIntervalC?: number[];
+  primaryImpactZone?: string | null;
+  nonLocalImpactC?: number | null;
+  compoundHotspotZone?: string | null;
+  compoundHotspotRate?: number | null;
+  evidence?: string[];
 }
 
 export interface SimulationRunResponse {
