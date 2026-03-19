@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from typing import Any, Mapping
+from urllib import error, request as urllib_request
 from uuid import uuid4
 
 from shacklib.backend_state import update_state
@@ -30,6 +31,23 @@ _DYNAMIC_VARIABLE_KEYS = (
     "estimated_impact",
     "energy_waste",
     "triggered_by",
+)
+
+_REQUIRED_DYNAMIC_VARIABLE_KEYS = frozenset(
+    {
+        "building_name",
+        "engineer_name",
+        "product_name",
+        "situation_summary",
+        "failure_name",
+        "likely_cause",
+        "fault_id",
+        "device_id",
+        "device_name",
+        "severity",
+        "recommended_action",
+        "detected_at",
+    }
 )
 
 
@@ -77,13 +95,155 @@ def get_elevenlabs_client() -> Any:
     return ElevenLabs(api_key=get_elevenlabs_api_key())
 
 
+def get_elevenlabs_phone_number_id() -> str:
+    """Return the registered ElevenLabs phone number ID.
+
+    Reads ELEVENLABS_PHONE_NUMBER_ID from env first; if absent, fetches the
+    first phone number assigned to the configured agent from the API.
+    """
+    value = str(os.getenv("ELEVENLABS_PHONE_NUMBER_ID") or "").strip()
+    if value:
+        return value
+
+    client = get_elevenlabs_client()
+    agent_id = get_elevenlabs_agent_id()
+    numbers = client.conversational_ai.phone_numbers.list()
+    for num in numbers:
+        info = getattr(num, "assigned_agent", None)
+        if info and getattr(info, "agent_id", None) == agent_id:
+            phone_number_id = getattr(num, "phone_number_id", None)
+            if phone_number_id:
+                return str(phone_number_id)
+
+    raise ElevenLabsConfigurationError(
+        "No phone number assigned to the configured agent. "
+        "Set ELEVENLABS_PHONE_NUMBER_ID or assign a number in the ElevenLabs dashboard."
+    )
+
+
+def place_outbound_call(
+    *,
+    to_number: str,
+    building_name: str,
+    engineer_name: str,
+    product_name: str,
+    situation_summary: str,
+    failure_name: str,
+    failure_summary: str,
+    likely_cause: str,
+    likely_cause_confidence: str,
+    fault_id: str,
+    device_id: str,
+    device_name: str,
+    severity: str,
+    recommended_action: str,
+    detected_at: str,
+    estimated_impact: str,
+    energy_waste: str,
+    triggered_by: str,
+) -> dict[str, Any]:
+    """Place an outbound call via ElevenLabs Twilio integration.
+
+    Returns a dict with keys: ok, conversationId, callSid.
+    """
+    try:
+        from elevenlabs.types import ConversationInitiationClientDataRequestInput
+    except ModuleNotFoundError as exc:
+        raise ElevenLabsConfigurationError(
+            "The elevenlabs SDK is not installed. Run `uv sync`."
+        ) from exc
+
+    dynamic_variables = build_outbound_dynamic_variables(
+        building_name=building_name,
+        engineer_name=engineer_name,
+        product_name=product_name,
+        situation_summary=situation_summary,
+        failure_name=failure_name,
+        failure_summary=failure_summary,
+        likely_cause=likely_cause,
+        likely_cause_confidence=likely_cause_confidence,
+        fault_id=fault_id,
+        device_id=device_id,
+        device_name=device_name,
+        severity=severity,
+        recommended_action=recommended_action,
+        detected_at=detected_at,
+        estimated_impact=estimated_impact,
+        energy_waste=energy_waste,
+        triggered_by=triggered_by,
+    )
+
+    client = get_elevenlabs_client()
+    agent_id = get_elevenlabs_agent_id()
+    phone_number_id = get_elevenlabs_phone_number_id()
+
+    result = client.conversational_ai.twilio.outbound_call(
+        agent_id=agent_id,
+        agent_phone_number_id=phone_number_id,
+        to_number=to_number,
+        conversation_initiation_client_data=ConversationInitiationClientDataRequestInput(
+            dynamic_variables=dynamic_variables,
+        ),
+    )
+
+    LOGGER.info(
+        json.dumps(
+            {
+                "message": "placed_elevenlabs_outbound_call",
+                "conversationId": getattr(result, "conversation_id", None),
+                "callSid": getattr(result, "call_sid", None),
+                "toNumber": to_number,
+                "faultId": fault_id,
+            }
+        )
+    )
+
+    return {
+        "ok": bool(getattr(result, "success", True)),
+        "conversationId": str(getattr(result, "conversation_id", "") or ""),
+        "callSid": str(getattr(result, "call_sid", "") or ""),
+    }
+
+
+_DEFAULT_BACKEND_URL = "http://localhost:9812"
+
+
+def escalate_fault(
+    fault_spec: dict[str, Any], *, backend_url: str | None = None
+) -> dict[str, Any]:
+    """HTTP client helper for use by the AI agent.
+
+    Posts the fault spec to the backend outbound-call route and returns the
+    response dict with keys: ok, conversationId, callSid.
+    """
+    base = (
+        backend_url or os.getenv("VITE_BACKEND_URL") or _DEFAULT_BACKEND_URL
+    ).rstrip("/")
+    url = f"{base}/api/voice/elevenlabs/outbound-call"
+    body = json.dumps(fault_spec).encode()
+    req = urllib_request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except error.HTTPError as exc:
+        raw = exc.read().decode(errors="replace")
+        raise RuntimeError(
+            f"Backend escalation call failed ({exc.code}): {raw}"
+        ) from exc
+
+
 def build_outbound_dynamic_variables(**kwargs: Any) -> dict[str, str]:
     payload: dict[str, str] = {}
 
     for key in _DYNAMIC_VARIABLE_KEYS:
         raw_value = kwargs.get(key)
         text = str(raw_value or "").strip()
-        if not text:
+        if not text and key in _REQUIRED_DYNAMIC_VARIABLE_KEYS:
             raise ElevenLabsWebhookPayloadError(
                 f"Missing required ElevenLabs dynamic variable: {key}"
             )
@@ -134,7 +294,9 @@ def normalize_post_call_webhook_event(event: Any) -> dict[str, Any]:
     if event_type == "call_initiation_failure":
         return _normalize_call_initiation_failure(data, event_timestamp)
 
-    raise ElevenLabsWebhookPayloadError(f"Unsupported ElevenLabs webhook type: {event_type}")
+    raise ElevenLabsWebhookPayloadError(
+        f"Unsupported ElevenLabs webhook type: {event_type}"
+    )
 
 
 def record_post_call_webhook_event(event: Mapping[str, Any]) -> dict[str, Any]:
@@ -209,7 +371,9 @@ def _normalize_post_call_transcription(
         "eventType": "post_call_transcription",
         "eventTimestamp": event_timestamp,
         "agentId": _optional_text(data.get("agent_id")),
-        "conversationId": _required_text(data.get("conversation_id"), "conversation_id"),
+        "conversationId": _required_text(
+            data.get("conversation_id"), "conversation_id"
+        ),
         "status": _optional_text(data.get("status")) or "done",
         "callSuccessful": _optional_text(analysis.get("call_successful")),
         "summary": summary,
@@ -217,7 +381,9 @@ def _normalize_post_call_transcription(
             "startTimeUnixSeconds": metadata.get("start_time_unix_secs"),
             "callDurationSeconds": metadata.get("call_duration_secs"),
             "terminationReason": _optional_text(metadata.get("termination_reason")),
-            "hasAudio": bool(data.get("has_audio")) if data.get("has_audio") is not None else None,
+            "hasAudio": bool(data.get("has_audio"))
+            if data.get("has_audio") is not None
+            else None,
             "hasUserAudio": bool(data.get("has_user_audio"))
             if data.get("has_user_audio") is not None
             else None,
@@ -236,14 +402,18 @@ def _normalize_post_call_transcription(
         },
         "futureEscalationAttempt": {
             "provider": "elevenlabs",
-            "conversationId": _required_text(data.get("conversation_id"), "conversation_id"),
+            "conversationId": _required_text(
+                data.get("conversation_id"), "conversation_id"
+            ),
             "status": "completed",
             "callSuccessful": _optional_text(analysis.get("call_successful")),
             "summary": summary,
             "acknowledged": _extract_data_collection_scalar(
                 data_collection.get("acknowledged"), expected_type=bool
             ),
-            "callbackEta": _extract_data_collection_text(data_collection.get("callback_eta")),
+            "callbackEta": _extract_data_collection_text(
+                data_collection.get("callback_eta")
+            ),
             "engineerResponseSummary": _extract_data_collection_text(
                 data_collection.get("engineer_response_summary")
             )
@@ -274,7 +444,9 @@ def _normalize_call_initiation_failure(
         "eventType": "call_initiation_failure",
         "eventTimestamp": event_timestamp,
         "agentId": _optional_text(data.get("agent_id")),
-        "conversationId": _required_text(data.get("conversation_id"), "conversation_id"),
+        "conversationId": _required_text(
+            data.get("conversation_id"), "conversation_id"
+        ),
         "failureReason": _optional_text(data.get("failure_reason")) or "unknown",
         "providerMetadata": {
             "type": provider_type,
@@ -287,7 +459,9 @@ def _normalize_call_initiation_failure(
         },
         "futureEscalationAttempt": {
             "provider": "elevenlabs",
-            "conversationId": _required_text(data.get("conversation_id"), "conversation_id"),
+            "conversationId": _required_text(
+                data.get("conversation_id"), "conversation_id"
+            ),
             "status": "call_initiation_failure",
             "failureReason": _optional_text(data.get("failure_reason")) or "unknown",
             "providerType": provider_type,
@@ -306,7 +480,8 @@ def _normalize_evaluation_criteria_results(
         value = _coerce_mapping(raw_value)
         if value:
             normalized[str(key)] = {
-                "result": _optional_text(value.get("result")) or _optional_text(raw_value),
+                "result": _optional_text(value.get("result"))
+                or _optional_text(raw_value),
                 "rationale": _optional_text(value.get("rationale")),
             }
             continue
@@ -362,9 +537,7 @@ def _coerce_mapping(value: Any) -> dict[str, Any]:
 
     if hasattr(value, "__dict__") and isinstance(value.__dict__, dict):
         return {
-            key: item
-            for key, item in value.__dict__.items()
-            if not key.startswith("_")
+            key: item for key, item in value.__dict__.items() if not key.startswith("_")
         }
 
     if hasattr(value, "model_dump"):

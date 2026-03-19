@@ -18,6 +18,11 @@ from shacklib.diagnosis_engine import (
     resolve_fault,
     utc_now_iso,
 )
+from shacklib.elevenlabs_agent import (
+    ElevenLabsConfigurationError,
+    ElevenLabsWebhookPayloadError,
+    place_outbound_call,
+)
 from shacklib.ml_inference_client import MLInferenceError, infer_failure_mode_for_node
 
 OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
@@ -29,7 +34,7 @@ _AUDIT_LOG_KEY = "auditLog"
 _AUDIT_LOG_LIMIT = 250
 _DOCUMENT_CONTEXT_CHAR_LIMIT = 15_000
 
-_MUTATING_TOOLS = {"resolve_fault"}
+_MUTATING_TOOLS = {"resolve_fault", "escalate_fault"}
 
 
 def _safe_int(value: Any, default: int, minimum: int, maximum: int) -> int:
@@ -61,7 +66,12 @@ def _system_prompt() -> str:
         "Use tools whenever you need current platform data. "
         "Never invent IDs, metrics, or fault states. "
         "When the user asks to execute an action, call the matching tool. "
-        "Keep answers short and operationally useful."
+        "Keep answers short and operationally useful.\n\n"
+        "IMPORTANT: You have full ability to place phone calls via the escalate_fault tool. "
+        "Never say you cannot place calls or send escalations. "
+        "When the user mentions a phone number and a fault or node, you MUST call escalate_fault. "
+        "If you do not know the faultId, call get_system_overview first to find it, then call escalate_fault. "
+        "Do not ask for confirmation. Do not offer alternatives. Just call the tool."
     )
     document_context = _building_document_context()
     if not document_context:
@@ -78,7 +88,9 @@ def _building_document_context() -> str:
     remaining = _DOCUMENT_CONTEXT_CHAR_LIMIT
 
     for document in documents:
-        filename = str(document.get("filename") or "document.txt").strip() or "document.txt"
+        filename = (
+            str(document.get("filename") or "document.txt").strip() or "document.txt"
+        )
         content = str(document.get("content_text") or "").strip()
         if not content:
             continue
@@ -98,7 +110,9 @@ def _building_document_context() -> str:
         if trimmed_content_budget <= 0:
             break
 
-        chunks.append(f"--- {filename} ---\n{content[:trimmed_content_budget].rstrip()}\n[truncated]")
+        chunks.append(
+            f"--- {filename} ---\n{content[:trimmed_content_budget].rstrip()}\n[truncated]"
+        )
         break
 
     return "\n\n".join(chunks)
@@ -176,6 +190,38 @@ def _tool_definitions() -> list[dict[str, Any]]:
                     },
                 },
                 "required": ["faultId"],
+                "additionalProperties": False,
+            },
+        },
+        {
+            "type": "function",
+            "name": "escalate_fault",
+            "description": (
+                "Place an outbound voice call to an on-site engineer about an active fault. "
+                "Use this tool whenever the user asks to call a phone number about a fault or node. "
+                "The platform handles the call. You do not need any external service — just call this tool."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "faultId": {
+                        "type": "string",
+                        "description": "The fault id to escalate, e.g. fault-003",
+                    },
+                    "toNumber": {
+                        "type": "string",
+                        "description": "E.164 phone number to call, e.g. +34672359401",
+                    },
+                    "engineerName": {
+                        "type": "string",
+                        "description": "Name of the engineer being called (optional, defaults to On-Site Engineer)",
+                    },
+                    "buildingName": {
+                        "type": "string",
+                        "description": "Building name override (optional, defaults to platform building name)",
+                    },
+                },
+                "required": ["faultId", "toNumber"],
                 "additionalProperties": False,
             },
         },
@@ -349,6 +395,10 @@ def _pending_action_summary(name: str, arguments: dict[str, Any]) -> str:
     if name == "resolve_fault":
         fault_id = str(arguments.get("faultId") or "unknown")
         return f"Resolve fault `{fault_id}`"
+    if name == "escalate_fault":
+        fault_id = str(arguments.get("faultId") or "unknown")
+        to_number = str(arguments.get("toNumber") or "unknown")
+        return f"Call {to_number} about fault `{fault_id}`"
     return f"Execute `{name}`"
 
 
@@ -479,6 +529,76 @@ def _tool_resolve_fault(arguments: dict[str, Any], actor: str) -> dict[str, Any]
     return update_state(_mutator)
 
 
+def _tool_escalate_fault(arguments: dict[str, Any]) -> dict[str, Any]:
+    fault_id = str(arguments.get("faultId") or "").strip()
+    to_number = str(arguments.get("toNumber") or "").strip()
+    engineer_name = str(arguments.get("engineerName") or "On-Site Engineer").strip()
+    building_name_override = str(arguments.get("buildingName") or "").strip()
+
+    if not fault_id:
+        return {"ok": False, "error": "faultId is required"}
+    if not to_number:
+        return {"ok": False, "error": "toNumber is required"}
+
+    def _mutator(state: dict[str, Any]) -> dict[str, Any]:
+        faults = state.get("faults") if isinstance(state.get("faults"), dict) else {}
+        nodes = state.get("nodes") if isinstance(state.get("nodes"), dict) else {}
+
+        fault = faults.get(fault_id) if isinstance(faults, dict) else None
+        if not isinstance(fault, dict):
+            return {"ok": False, "error": f"fault not found: {fault_id}"}
+
+        node_id = str(fault.get("nodeId") or "").strip()
+        node = nodes.get(node_id) if isinstance(nodes, dict) else None
+
+        building_name = building_name_override or str(
+            state.get("buildingName") or "Building Operations"
+        )
+        device_name = (
+            str(node.get("label") or node_id) if isinstance(node, dict) else node_id
+        )
+        severity = str(fault.get("severity") or fault.get("kind") or "unknown")
+        detected_at = str(fault.get("openedAt") or utc_now_iso())
+
+        try:
+            result = place_outbound_call(
+                to_number=to_number,
+                building_name=building_name,
+                engineer_name=engineer_name,
+                product_name=device_name,
+                situation_summary=str(
+                    fault.get("summary") or "A fault has been detected."
+                ),
+                failure_name=str(fault.get("kind") or "unknown fault"),
+                failure_summary=str(fault.get("summary") or ""),
+                likely_cause=str(
+                    fault.get("likelyCause")
+                    or fault.get("summary")
+                    or "under investigation"
+                ),
+                likely_cause_confidence=str(fault.get("probability") or ""),
+                fault_id=fault_id,
+                device_id=node_id,
+                device_name=device_name,
+                severity=severity,
+                recommended_action=str(
+                    fault.get("recommendedAction") or "Contact operations team."
+                ),
+                detected_at=detected_at,
+                estimated_impact=str(fault.get("estimatedImpact") or ""),
+                energy_waste=str(fault.get("energyWaste") or ""),
+                triggered_by="Belimo Ops Copilot",
+            )
+        except (ElevenLabsConfigurationError, ElevenLabsWebhookPayloadError) as exc:
+            return {"ok": False, "error": str(exc)}
+        except Exception as exc:
+            return {"ok": False, "error": f"Call failed: {exc}"}
+
+        return result
+
+    return update_state(_mutator)
+
+
 def _tool_run_node_diagnosis(node_id: str) -> dict[str, Any]:
     state = read_state()
     nodes = state.get("nodes") if isinstance(state.get("nodes"), dict) else {}
@@ -530,6 +650,9 @@ def _execute_tool(name: str, arguments: dict[str, Any], actor: str) -> dict[str,
 
     if name == "resolve_fault":
         return _tool_resolve_fault(arguments, actor=actor)
+
+    if name == "escalate_fault":
+        return _tool_escalate_fault(arguments)
 
     if name == "run_node_diagnosis":
         node_id = str(arguments.get("nodeId") or "").strip()
@@ -603,6 +726,13 @@ def _pending_action_reply(name: str, arguments: dict[str, Any], action_id: str) 
             f"I can resolve fault `{fault_id}` now. Approve this action to apply the change. "
             f"Pending action id: {action_id}."
         )
+    if name == "escalate_fault":
+        fault_id = str(arguments.get("faultId") or "unknown")
+        to_number = str(arguments.get("toNumber") or "unknown")
+        return (
+            f"I am ready to call {to_number} about fault `{fault_id}`. "
+            f"Approve this action to place the call. Pending action id: {action_id}."
+        )
     return f"I need approval before executing `{name}`. Pending action id: {action_id}."
 
 
@@ -611,6 +741,7 @@ def _handle_pending_decision(
     action_id: str,
     decision: str,
     actor: str,
+    prior_conversation: list[dict[str, Any]],
 ) -> dict[str, Any]:
     pending_action = _pop_pending_action(action_id)
     if pending_action is None:
@@ -660,19 +791,40 @@ def _handle_pending_decision(
         details={"pendingActionId": action_id, "result": result},
     )
 
+    tool_event = {
+        "name": name,
+        "arguments": tool_arguments,
+        "outcome": "executed",
+        "result": result,
+    }
+
+    # Run the LLM one more time so the agent gives a natural confirmation.
+    try:
+        conversation = list(prior_conversation)
+        conversation.append(
+            {
+                "type": "function_call_output",
+                "call_id": f"approved-{action_id}",
+                "output": _serialize_tool_output(result),
+            }
+        )
+        response_payload = _openai_request(conversation)
+        reply = _extract_output_text(response_payload) or "Done."
+        model = str(response_payload.get("model") or _agent_model())
+    except Exception:
+        reply = "The action was executed." + (
+            " Call placed successfully."
+            if result.get("ok")
+            else f" Note: {result.get('error', 'unknown error')}."
+        )
+        model = _agent_model()
+
     return {
-        "reply": "Approved. The action has been executed on the platform.",
-        "model": _agent_model(),
+        "reply": reply,
+        "model": model,
         "generatedAt": utc_now_iso(),
         "usedFallback": False,
-        "toolEvents": [
-            {
-                "name": name,
-                "arguments": tool_arguments,
-                "outcome": "executed",
-                "result": result,
-            }
-        ],
+        "toolEvents": [tool_event],
         "pendingAction": None,
     }
 
@@ -694,10 +846,22 @@ def run_codex_agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
                 "toolEvents": [],
                 "pendingAction": None,
             }
+        raw_messages = payload.get("messages") or []
+        prior: list[dict[str, Any]] = [
+            {
+                "role": str(m.get("role") or "user"),
+                "content": str(m.get("content") or ""),
+            }
+            for m in raw_messages
+            if isinstance(m, dict)
+            and m.get("role") in {"user", "assistant"}
+            and m.get("content")
+        ]
         return _handle_pending_decision(
             action_id=action_id,
             decision=decision,
             actor=actor,
+            prior_conversation=prior,
         )
 
     raw_messages = payload.get("messages")

@@ -295,6 +295,33 @@ class ElevenLabsWebhookReceipt(BaseModel):
     recordedAt: str
 
 
+class ElevenLabsOutboundCallRequest(BaseModel):
+    toNumber: str = Field(min_length=7)
+    buildingName: str = Field(min_length=1)
+    engineerName: str = Field(min_length=1)
+    productName: str = Field(min_length=1)
+    situationSummary: str = Field(min_length=1)
+    failureName: str = Field(min_length=1)
+    failureSummary: str = Field(default="")
+    likelyCause: str = Field(min_length=1)
+    likelyCauseConfidence: str = Field(default="")
+    faultId: str = Field(min_length=1)
+    deviceId: str = Field(min_length=1)
+    deviceName: str = Field(min_length=1)
+    severity: str = Field(min_length=1)
+    recommendedAction: str = Field(min_length=1)
+    detectedAt: str = Field(min_length=1)
+    estimatedImpact: str = Field(default="")
+    energyWaste: str = Field(default="")
+    triggeredBy: str = Field(default="automated fault classifier")
+
+
+class ElevenLabsOutboundCallResponse(BaseModel):
+    ok: bool
+    conversationId: str
+    callSid: str
+
+
 class SimulationFailureInput(BaseModel):
     componentId: str = Field(min_length=1)
     mode: str = Field(min_length=1)

@@ -12,6 +12,8 @@ from schemas import (
     AgentChatResponse,
     DocumentListItem,
     DocumentUploadResponse,
+    ElevenLabsOutboundCallRequest,
+    ElevenLabsOutboundCallResponse,
     ElevenLabsWebhookReceipt,
     BayesianView,
     IngestPayload,
@@ -59,6 +61,7 @@ from shacklib.elevenlabs_agent import (
     ElevenLabsConfigurationError,
     ElevenLabsSignatureError,
     ElevenLabsWebhookPayloadError,
+    place_outbound_call,
     record_post_call_webhook_event,
     validate_and_normalize_post_call_webhook,
 )
@@ -325,6 +328,44 @@ async def elevenlabs_post_call(request: Request) -> ElevenLabsWebhookReceipt:
         ) from exc
 
     return ElevenLabsWebhookReceipt.model_validate(receipt)
+
+
+@app.post(
+    "/api/voice/elevenlabs/outbound-call",
+    response_model=ElevenLabsOutboundCallResponse,
+)
+async def elevenlabs_outbound_call(
+    payload: ElevenLabsOutboundCallRequest,
+) -> ElevenLabsOutboundCallResponse:
+    try:
+        result = place_outbound_call(
+            to_number=payload.toNumber,
+            building_name=payload.buildingName,
+            engineer_name=payload.engineerName,
+            product_name=payload.productName,
+            situation_summary=payload.situationSummary,
+            failure_name=payload.failureName,
+            failure_summary=payload.failureSummary,
+            likely_cause=payload.likelyCause,
+            likely_cause_confidence=payload.likelyCauseConfidence,
+            fault_id=payload.faultId,
+            device_id=payload.deviceId,
+            device_name=payload.deviceName,
+            severity=payload.severity,
+            recommended_action=payload.recommendedAction,
+            detected_at=payload.detectedAt,
+            estimated_impact=payload.estimatedImpact,
+            energy_waste=payload.energyWaste,
+            triggered_by=payload.triggeredBy,
+        )
+    except ElevenLabsConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except ElevenLabsWebhookPayloadError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return ElevenLabsOutboundCallResponse.model_validate(result)
 
 
 @app.post("/api/simulation/run", response_model=SimulationRunResponse)
