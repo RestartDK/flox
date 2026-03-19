@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas import (
@@ -12,6 +12,7 @@ from schemas import (
     AgentChatResponse,
     DocumentListItem,
     DocumentUploadResponse,
+    ElevenLabsWebhookReceipt,
     BayesianView,
     IngestPayload,
     IngestResponse,
@@ -54,6 +55,13 @@ from shacklib.ml_inference_client import (
 )
 from shacklib.simulation_service import run_simulation_bundle
 from shacklib.state_seed import seed_state_on_startup
+from shacklib.elevenlabs_agent import (
+    ElevenLabsConfigurationError,
+    ElevenLabsSignatureError,
+    ElevenLabsWebhookPayloadError,
+    record_post_call_webhook_event,
+    validate_and_normalize_post_call_webhook,
+)
 
 load_dotenv()
 
@@ -284,6 +292,39 @@ async def ml_failure_mode(payload: MlFailureModeRequest) -> MlFailureModeRespons
 async def agent_chat(payload: AgentChatRequest) -> AgentChatResponse:
     response = run_codex_agent_chat(payload.model_dump(mode="python"))
     return AgentChatResponse.model_validate(response)
+
+
+@app.post(
+    "/api/voice/elevenlabs/post-call",
+    response_model=ElevenLabsWebhookReceipt,
+)
+async def elevenlabs_post_call(request: Request) -> ElevenLabsWebhookReceipt:
+    payload = await request.body()
+    signature = request.headers.get("elevenlabs-signature")
+
+    try:
+        normalized = validate_and_normalize_post_call_webhook(
+            payload=payload,
+            signature=signature,
+        )
+        receipt = record_post_call_webhook_event(normalized)
+    except ElevenLabsSignatureError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="invalid ElevenLabs webhook signature",
+        ) from exc
+    except ElevenLabsConfigurationError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+    except ElevenLabsWebhookPayloadError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    return ElevenLabsWebhookReceipt.model_validate(receipt)
 
 
 @app.post("/api/simulation/run", response_model=SimulationRunResponse)

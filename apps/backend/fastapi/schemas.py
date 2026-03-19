@@ -288,6 +288,13 @@ class AgentChatResponse(BaseModel):
     pendingAction: AgentPendingAction | None = None
 
 
+class ElevenLabsWebhookReceipt(BaseModel):
+    ok: bool
+    eventType: Literal["post_call_transcription", "call_initiation_failure"]
+    conversationId: str
+    recordedAt: str
+
+
 class SimulationFailureInput(BaseModel):
     componentId: str = Field(min_length=1)
     mode: str = Field(min_length=1)
