@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle, Zap, Clock, Wrench } from 'lucide-react';
+import { X, AlertTriangle, Zap, Clock, Wrench, Check } from 'lucide-react';
 import { type Device } from '@/data/mockDevices';
+import { useResolveFault } from '@/hooks/useFacilityData';
 import Sparkline from './Sparkline';
 
 interface DeviceDetailPanelProps {
@@ -15,14 +16,15 @@ const statusStyles: Record<string, string> = {
   offline: 'text-status-offline',
 };
 
-const severityStyles: Record<string, string> = {
-  critical: 'border-status-fault bg-status-fault/10 text-status-fault',
-  high: 'border-status-warning bg-status-warning/10 text-status-warning',
-  medium: 'border-muted bg-muted text-muted-foreground',
-  low: 'border-muted bg-muted text-muted-foreground',
+const severityBadge: Record<string, string> = {
+  critical: 'bg-status-fault/15 text-status-fault border-status-fault/30',
+  high: 'bg-status-warning/15 text-status-warning border-status-warning/30',
+  medium: 'bg-status-warning/15 text-status-warning border-status-warning/30',
+  low: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanelProps) {
+  const { mutate: resolve } = useResolveFault();
   return (
     <AnimatePresence>
       {device && (
@@ -102,22 +104,31 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
               </div>
               <div className="space-y-3">
                 {device.faults.map(fault => (
-                  <div key={fault.id} className={`border p-3 ${severityStyles[fault.severity]}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-display text-[12px] font-semibold">{fault.type}</span>
-                      <span className="text-[10px] uppercase tracking-wider font-medium">{fault.severity}</span>
-                    </div>
-                    
-                    <div className="text-[12px] leading-relaxed opacity-90 mb-3">{fault.diagnosis}</div>
+                  <div key={fault.id} className="border border-border bg-card p-3">
+                    <div className="text-[13px] font-medium">{fault.type}</div>
+                    <span className={`inline-block mt-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[fault.severity]}`}>
+                      {fault.severity}
+                    </span>
 
-                    <div className="border-t border-current/20 pt-2 mt-2">
+                    <div className="text-[12px] leading-relaxed text-muted-foreground mt-2.5">{fault.diagnosis}</div>
+
+                    <div className="border-t border-border pt-2 mt-2.5">
                       <div className="flex items-start gap-1.5 mb-2">
-                        <Wrench size={11} className="mt-0.5 shrink-0" />
-                        <span className="text-[11px] leading-relaxed">{fault.recommendation}</span>
+                        <Wrench size={11} className="mt-0.5 shrink-0 text-muted-foreground" />
+                        <span className="text-[11px] leading-relaxed text-muted-foreground">{fault.recommendation}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-[11px]">
-                        <span className="flex items-center gap-1"><Zap size={10} />{fault.energyWaste}</span>
-                        <span className="flex items-center gap-1"><Clock size={10} />{new Date(fault.detectedAt).toLocaleDateString()}</span>
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1"><Zap size={10} />{fault.energyWaste}</span>
+                          <span className="flex items-center gap-1"><Clock size={10} />{new Date(fault.detectedAt).toLocaleDateString()}</span>
+                        </div>
+                        <button
+                          onClick={() => resolve(fault.id)}
+                          className="flex items-center gap-1 px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-[11px]"
+                        >
+                          <Check size={10} />
+                          Resolve
+                        </button>
                       </div>
                     </div>
                   </div>

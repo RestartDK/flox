@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { type Device, type Fault } from '@/data/mockDevices';
-import { ChevronRight, Zap } from 'lucide-react';
+import { useResolveFault } from '@/hooks/useFacilityData';
+import { Zap, Check } from 'lucide-react';
 
 interface AlertDashboardProps {
   devices: Device[];
@@ -22,12 +23,13 @@ const parseEnergyWaste = (value: string) => {
 const severityBadge: Record<string, string> = {
   critical: 'bg-status-fault/15 text-status-fault border-status-fault/30',
   high: 'bg-status-warning/15 text-status-warning border-status-warning/30',
-  medium: 'bg-muted text-muted-foreground border-border',
+  medium: 'bg-status-warning/15 text-status-warning border-status-warning/30',
   low: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDashboardProps) {
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const { mutate: resolve } = useResolveFault();
 
   const alerts: AlertItem[] = devices
     .flatMap(device => device.faults.map(fault => ({ device, fault })))
@@ -70,7 +72,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
           <span className="label-caps w-28">Zone</span>
           <span className="label-caps w-24">Impact</span>
           <span className="label-caps w-20">Severity</span>
-          <span className="w-8" />
+          <span className="w-20" />
         </div>
 
         {filtered.map(alert => (
@@ -93,8 +95,14 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
                 {alert.fault.severity}
               </span>
             </div>
-            <div className="w-8 flex justify-end">
-              <ChevronRight size={14} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+            <div className="w-20 flex justify-end">
+              <button
+                onClick={(e) => { e.stopPropagation(); resolve(alert.fault.id); }}
+                className="flex items-center gap-1 text-[11px] px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+              >
+                <Check size={10} />
+                Resolve
+              </button>
             </div>
           </div>
         ))}
