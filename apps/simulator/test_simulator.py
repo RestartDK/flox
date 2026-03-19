@@ -18,6 +18,7 @@ from shacklib.node_simulator import (
     add_noise,
     build_profiles,
     load_dataset,
+    representative_row,
     row_to_payload,
 )
 
@@ -79,6 +80,19 @@ def test_add_noise_changes_continuous_preserves_bounds():
     assert 0.0 <= noisy[1] <= 100.0
     # power non-negative
     assert noisy[4] >= 0.0
+
+
+def test_representative_row_is_deterministic_and_bounded():
+    df = _load()
+    profiles = build_profiles(df)
+    cls = next(iter(profiles.keys()))
+    row = representative_row(profiles[cls])
+    row_again = representative_row(profiles[cls])
+    assert np.allclose(row, row_again)
+    assert 0.0 <= row[0] <= 100.0
+    assert 0.0 <= row[1] <= 100.0
+    assert row[4] >= 0.0
+    assert row[-1] in {0.0, 1.0, 2.0}
 
 
 def test_row_to_payload_maps_fields():

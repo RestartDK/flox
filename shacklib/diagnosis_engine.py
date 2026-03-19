@@ -368,12 +368,16 @@ def _propagate_parent_status(nodes: dict[str, dict[str, Any]]) -> None:
 def run_diagnosis_cycle(
     state: dict[str, Any],
     classifier: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
+    target_node_ids: set[str] | None = None,
 ) -> dict[str, int]:
     nodes: dict[str, dict[str, Any]] = state.setdefault("nodes", {})
     faults: dict[str, dict[str, Any]] = state.setdefault("faults", {})
 
     processed_nodes = 0
     for node_id, node in nodes.items():
+        if target_node_ids is not None and node_id not in target_node_ids:
+            continue
+
         telemetry = node.get("latestTelemetry") or {}
         if not telemetry:
             node.setdefault("status", "healthy")
@@ -387,7 +391,8 @@ def run_diagnosis_cycle(
 
         _attach_fault(faults, node_id, node, diagnosis)
 
-    _propagate_parent_status(nodes)
+    if processed_nodes > 0:
+        _propagate_parent_status(nodes)
     state.setdefault("meta", {})["lastClassificationAt"] = utc_now_iso()
 
     open_faults = sum(1 for fault in faults.values() if fault.get("state") == "open")

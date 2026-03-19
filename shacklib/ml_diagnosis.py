@@ -1,12 +1,60 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any
 
 from shacklib.diagnosis_engine import classify_node_heuristic, run_diagnosis_cycle
 from shacklib.ml_inference_client import MLInferenceError, infer_failure_mode_for_node
 
 DEFAULT_ML_TIMEOUT_SECONDS = 3.0
+
+
+def _parse_utc(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    else:
+        parsed = parsed.astimezone(timezone.utc)
+
+    return parsed
+
+
+def _should_classify_node(
+    node: dict[str, Any],
+    *,
+    last_classification_at: datetime | None,
+    last_ingest_at: datetime | None,
+) -> bool:
+    if not node.get("latestTelemetry"):
+        return False
+
+    updated_at = _parse_utc(node.get("updatedAt")) or _parse_utc(
+        node.get("latestTelemetryAt")
+    )
+    if updated_at is None:
+        return False
+
+    if last_classification_at is not None:
+        return updated_at > last_classification_at
+
+    if last_ingest_at is not None:
+        return updated_at >= last_ingest_at
+
+    return False
 
 
 def resolve_ml_timeout_seconds(explicit_timeout: float | None = None) -> float:
@@ -32,6 +80,14 @@ def collect_diagnoses(
         if isinstance(state_snapshot.get("nodes"), dict)
         else {}
     )
+    meta = (
+        state_snapshot.get("meta")
+        if isinstance(state_snapshot.get("meta"), dict)
+        else {}
+    )
+
+    last_classification_at = _parse_utc(meta.get("lastClassificationAt"))
+    last_ingest_at = _parse_utc(meta.get("lastIngestAt"))
     timeout = resolve_ml_timeout_seconds(timeout_seconds)
 
     diagnoses_by_node: dict[str, dict[str, Any] | None] = {}
@@ -39,12 +95,18 @@ def collect_diagnoses(
         "mlPredictions": 0,
         "fallbackPredictions": 0,
         "mlErrors": 0,
+        "skippedNodes": 0,
     }
 
     for node_id, node in nodes.items():
         if not isinstance(node, dict):
             continue
-        if not node.get("latestTelemetry"):
+        if not _should_classify_node(
+            node,
+            last_classification_at=last_classification_at,
+            last_ingest_at=last_ingest_at,
+        ):
+            source_stats["skippedNodes"] += 1
             continue
 
         node_payload = {"id": node_id, **node}
@@ -68,12 +130,18 @@ def apply_diagnoses(
     state: dict[str, Any],
     diagnoses_by_node: dict[str, dict[str, Any] | None] | None = None,
 ) -> dict[str, int]:
-    diagnosis_lookup = diagnoses_by_node or {}
+    if diagnoses_by_node is None:
+        return run_diagnosis_cycle(state, classifier=classify_node_heuristic)
+
+    diagnosis_lookup = diagnoses_by_node
+    target_node_ids = set(diagnosis_lookup.keys())
 
     def _classifier(node: dict[str, Any]) -> dict[str, Any] | None:
         node_id = str(node.get("id") or "")
-        if node_id in diagnosis_lookup:
-            return diagnosis_lookup[node_id]
-        return classify_node_heuristic(node)
+        return diagnosis_lookup.get(node_id)
 
-    return run_diagnosis_cycle(state, classifier=_classifier)
+    return run_diagnosis_cycle(
+        state,
+        classifier=_classifier,
+        target_node_ids=target_node_ids,
+    )
