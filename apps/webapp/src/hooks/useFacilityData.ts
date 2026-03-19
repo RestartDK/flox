@@ -40,7 +40,7 @@ export const useFacilityData = () => {
 export const useResolveFault = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (faultId: string) =>
       fetch(buildBackendUrl(`/api/faults/${encodeURIComponent(faultId)}/resolve`), {
         method: 'POST',
@@ -60,4 +60,10 @@ export const useResolveFault = () => {
       ]);
     },
   });
+
+  return {
+    ...mutation,
+    /** The fault id currently being resolved, or null when idle. */
+    pendingFaultId: mutation.isPending ? (mutation.variables ?? null) : null,
+  };
 };

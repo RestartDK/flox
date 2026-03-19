@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle, Zap, Clock, Wrench, Check } from 'lucide-react';
+import { X, AlertTriangle, Zap, Clock, Wrench, Check, Loader2 } from 'lucide-react';
 import { type Device } from '@/data/mockDevices';
 import { useResolveFault } from '@/hooks/useFacilityData';
 import Sparkline from './Sparkline';
@@ -24,7 +24,7 @@ const severityBadge: Record<string, string> = {
 };
 
 export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanelProps) {
-  const { mutate: resolve } = useResolveFault();
+  const { mutate: resolve, pendingFaultId } = useResolveFault();
   return (
     <AnimatePresence>
       {device && (
@@ -103,36 +103,40 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
                 Active Faults ({device.faults.length})
               </div>
               <div className="space-y-3">
-                {device.faults.map(fault => (
-                  <div key={fault.id} className="border border-border bg-card p-3">
-                    <div className="text-[13px] font-medium">{fault.type}</div>
-                    <span className={`inline-block mt-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[fault.severity]}`}>
-                      {fault.severity}
-                    </span>
+                {device.faults.map(fault => {
+                  const isPending = pendingFaultId === fault.id;
+                  return (
+                    <div key={fault.id} className={`border border-border bg-card p-3 ${isPending ? 'opacity-50' : ''}`}>
+                      <div className="text-[13px] font-medium">{fault.type}</div>
+                      <span className={`inline-block mt-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[fault.severity]}`}>
+                        {fault.severity}
+                      </span>
 
-                    <div className="text-[12px] leading-relaxed text-muted-foreground mt-2.5">{fault.diagnosis}</div>
+                      <div className="text-[12px] leading-relaxed text-muted-foreground mt-2.5">{fault.diagnosis}</div>
 
-                    <div className="border-t border-border pt-2 mt-2.5">
-                      <div className="flex items-start gap-1.5 mb-2">
-                        <Wrench size={11} className="mt-0.5 shrink-0 text-muted-foreground" />
-                        <span className="text-[11px] leading-relaxed text-muted-foreground">{fault.recommendation}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1"><Zap size={10} />{fault.energyWaste}</span>
-                          <span className="flex items-center gap-1"><Clock size={10} />{new Date(fault.detectedAt).toLocaleDateString()}</span>
+                      <div className="border-t border-border pt-2 mt-2.5">
+                        <div className="flex items-start gap-1.5 mb-2">
+                          <Wrench size={11} className="mt-0.5 shrink-0 text-muted-foreground" />
+                          <span className="text-[11px] leading-relaxed text-muted-foreground">{fault.recommendation}</span>
                         </div>
-                        <button
-                          onClick={() => resolve(fault.id)}
-                          className="flex items-center gap-1 px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-[11px]"
-                        >
-                          <Check size={10} />
-                          Resolve
-                        </button>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1"><Zap size={10} />{fault.energyWaste}</span>
+                            <span className="flex items-center gap-1"><Clock size={10} />{new Date(fault.detectedAt).toLocaleDateString()}</span>
+                          </div>
+                          <button
+                            disabled={isPending}
+                            onClick={() => resolve(fault.id)}
+                            className="flex items-center gap-1 px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors text-[11px] disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isPending ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                            {isPending ? 'Resolving...' : 'Resolve'}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
