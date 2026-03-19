@@ -145,6 +145,62 @@ export interface FacilityStatusResponse extends FacilityNodesResponse {
   meta: FacilityMeta;
 }
 
+export interface AgentChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AgentToolEvent {
+  name: string;
+  arguments: Record<string, unknown>;
+  outcome: 'executed' | 'pending_approval' | 'error';
+  result: Record<string, unknown> | null;
+}
+
+export interface AgentPendingAction {
+  id: string;
+  name: string;
+  summary: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AgentChatRequest {
+  messages: AgentChatMessage[];
+  actor?: string;
+  pendingActionId?: string;
+  pendingActionDecision?: 'approve' | 'reject';
+}
+
+export interface AgentChatResponse {
+  reply: string;
+  model: string;
+  generatedAt: string;
+  usedFallback: boolean;
+  toolEvents: AgentToolEvent[];
+  pendingAction: AgentPendingAction | null;
+}
+
+export interface NodeFaultHistoryEntry {
+  id: string;
+  state: 'open' | 'resolved';
+  kind: string;
+  probability: number;
+  summary: string;
+  recommendedAction: string;
+  openedAt: string;
+  updatedAt: string;
+  resolvedBy: string | null;
+  note: string | null;
+}
+
+export interface NodeFaultHistoryResponse {
+  nodeId: string;
+  nodeLabel: string;
+  totalFaults: number;
+  openFaults: number;
+  faultHistory: NodeFaultHistoryEntry[];
+}
+
 const generateTelemetry = (base: number, variance: number, anomaly = false): TelemetryPoint[] => {
   return Array.from({ length: 24 }, (_, i) => ({
     time: `${String(i).padStart(2, '0')}:00`,

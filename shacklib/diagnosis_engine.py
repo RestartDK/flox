@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from shacklib.mock_facility import build_catalog, build_seed_state
@@ -255,6 +255,10 @@ def _classify_node(node: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def classify_node_heuristic(node: dict[str, Any]) -> dict[str, Any] | None:
+    return _classify_node(node)
+
+
 def _resolve_existing_fault(
     faults: dict[str, dict[str, Any]],
     fault_id: str | None,
@@ -361,7 +365,10 @@ def _propagate_parent_status(nodes: dict[str, dict[str, Any]]) -> None:
         nodes[node_id]["status"] = status
 
 
-def run_diagnosis_cycle(state: dict[str, Any]) -> dict[str, int]:
+def run_diagnosis_cycle(
+    state: dict[str, Any],
+    classifier: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
+) -> dict[str, int]:
     nodes: dict[str, dict[str, Any]] = state.setdefault("nodes", {})
     faults: dict[str, dict[str, Any]] = state.setdefault("faults", {})
 
@@ -373,7 +380,7 @@ def run_diagnosis_cycle(state: dict[str, Any]) -> dict[str, int]:
             continue
 
         processed_nodes += 1
-        diagnosis = _classify_node(node)
+        diagnosis = classifier(node) if classifier else _classify_node(node)
         if diagnosis is None:
             _clear_fault(node, faults)
             continue
@@ -419,6 +426,56 @@ def resolve_fault(
         "ok": True,
         "faultId": fault_id,
         "state": "resolved",
+    }
+
+
+def build_node_fault_history_payload(
+    state: dict[str, Any],
+    node_id: str,
+    limit: int = 25,
+) -> dict[str, Any]:
+    nodes: dict[str, dict[str, Any]] = state.get("nodes") or {}
+    faults: dict[str, dict[str, Any]] = state.get("faults") or {}
+
+    history: list[dict[str, Any]] = []
+    for fault in faults.values():
+        if not isinstance(fault, dict):
+            continue
+        if str(fault.get("nodeId") or "") != node_id:
+            continue
+
+        history.append(
+            {
+                "id": str(fault.get("id") or ""),
+                "state": str(fault.get("state") or "resolved"),
+                "kind": str(fault.get("kind") or "unknown"),
+                "probability": round(float(fault.get("probability") or 0.0), 2),
+                "summary": str(fault.get("summary") or ""),
+                "recommendedAction": str(fault.get("recommendedAction") or ""),
+                "openedAt": str(fault.get("openedAt") or utc_now_iso()),
+                "updatedAt": str(fault.get("updatedAt") or utc_now_iso()),
+                "resolvedBy": fault.get("resolvedBy"),
+                "note": fault.get("note"),
+            }
+        )
+
+    history.sort(
+        key=lambda item: str(item.get("updatedAt") or item.get("openedAt") or ""),
+        reverse=True,
+    )
+
+    node = nodes.get(node_id)
+    node_label = (
+        node.get("label") if isinstance(node, dict) else _label_from_node_id(node_id)
+    )
+
+    clamped_limit = max(1, min(int(limit), 100))
+    return {
+        "nodeId": node_id,
+        "nodeLabel": node_label,
+        "totalFaults": len(history),
+        "openFaults": sum(1 for item in history if item.get("state") == "open"),
+        "faultHistory": history[:clamped_limit],
     }
 
 

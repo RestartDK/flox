@@ -1,9 +1,9 @@
 import { type BuildingStats } from '@/data/mockDevices';
-import { AlertTriangle, Map, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Bot, Map, type LucideIcon } from 'lucide-react';
 
 interface AppSidebarProps {
-  activeView: 'map' | 'alerts';
-  onViewChange: (view: 'map' | 'alerts') => void;
+  activeView: 'map' | 'alerts' | 'agent';
+  onViewChange: (view: 'map' | 'alerts' | 'agent') => void;
   buildingStats: BuildingStats;
 }
 
@@ -34,6 +34,7 @@ export default function AppSidebar({ activeView, onViewChange, buildingStats }: 
       <div className="py-2 border-b border-sidebar-border">
         <NavItem icon={Map} label="Facility Map" active={activeView === 'map'} onClick={() => onViewChange('map')} />
         <NavItem icon={AlertTriangle} label="Alert Dashboard" active={activeView === 'alerts'} onClick={() => onViewChange('alerts')} />
+        <NavItem icon={Bot} label="Operations Agent" active={activeView === 'agent'} onClick={() => onViewChange('agent')} />
       </div>
 
       {/* Device Summary */}

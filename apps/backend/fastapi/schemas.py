@@ -174,6 +174,54 @@ class ResolveFaultResponse(BaseModel):
     state: FaultState
 
 
+class NodeFaultHistoryEntry(BaseModel):
+    id: str
+    state: FaultState
+    kind: str
+    probability: float
+    summary: str
+    recommendedAction: str
+    openedAt: str
+    updatedAt: str
+    resolvedBy: str | None = None
+    note: str | None = None
+
+
+class NodeFaultHistoryResponse(BaseModel):
+    nodeId: str
+    nodeLabel: str
+    totalFaults: int
+    openFaults: int
+    faultHistory: list[NodeFaultHistoryEntry]
+
+
+class MlFailureModeRequest(BaseModel):
+    nodeId: str = Field(min_length=1)
+    timeoutSeconds: float | None = Field(default=None, ge=0.2, le=30.0)
+
+
+class MlFailureModeDiagnosis(BaseModel):
+    status: NodeStatus
+    kind: str
+    probability: float
+    summary: str
+    recommendedAction: str
+
+
+class MlFailureModeResponse(BaseModel):
+    nodeId: str
+    generatedAt: str
+    mlUrl: str
+    modelType: str | None = None
+    task: str | None = None
+    prediction: int | None = None
+    className: str | None = None
+    confidence: float | None = None
+    diagnosis: MlFailureModeDiagnosis | None = None
+    available: bool = True
+    error: str | None = None
+
+
 class AgentChatMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1)
