@@ -18,3 +18,4 @@ ml/data/processed/synthetic_benchmark/*.csv
 ml/models/weights/*
 !ml/models/weights/synthetic_benchmark/
 !ml/models/weights/synthetic_benchmark/**
+Belimo-START-Hack-2026/
