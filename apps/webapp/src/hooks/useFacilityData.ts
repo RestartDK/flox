@@ -1,22 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FacilityStatusResponse } from '@/data/mockDevices';
-import { resolveBackendBaseUrl } from '@/lib/backendConfig';
-
-const getApiUrl = (path: string) => {
-  const baseUrl = resolveBackendBaseUrl({
-    explicitUrl: import.meta.env.VITE_BACKEND_URL,
-    isProduction: import.meta.env.PROD,
-  });
-
-  if (!baseUrl) {
-    return path;
-  }
-
-  return `${baseUrl}${path}`;
-};
+import { buildBackendUrl } from '@/lib/backend';
 
 const fetchFacilityStatus = async (): Promise<FacilityStatusResponse> => {
-  const response = await fetch(getApiUrl('/api/status'), {
+  const response = await fetch(buildBackendUrl('/api/status'), {
     cache: 'no-store',
   });
 
@@ -55,7 +42,7 @@ export const useResolveFault = () => {
 
   return useMutation({
     mutationFn: (faultId: string) =>
-      fetch(getApiUrl(`/api/faults/${encodeURIComponent(faultId)}/resolve`), {
+      fetch(buildBackendUrl(`/api/faults/${encodeURIComponent(faultId)}/resolve`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resolvedBy: 'operator' }),
