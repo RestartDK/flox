@@ -232,3 +232,94 @@ export interface MlFailureModeResponse {
   available: boolean;
   error: string | null;
 }
+
+export interface SimulationFailureInput {
+  componentId: string;
+  mode: string;
+  severity?: number;
+  startSeconds?: number;
+  endSeconds?: number | null;
+}
+
+export interface SimulationRunRequest {
+  durationSeconds?: number;
+  dtSeconds?: number;
+  failures?: SimulationFailureInput[];
+}
+
+export interface SimulationTimeline {
+  timesSeconds: number[];
+  zoneTemperatures: Record<string, number[]>;
+  rowTemperatures: Record<string, number[]>;
+  zoneSupplyFlows: Record<string, number[]>;
+  zoneExhaustFlows: Record<string, number[]>;
+  nodePositionsTimeline: Record<string, number>[];
+  maxCpuTemperature: number[];
+  throttledCpuCount: number[];
+  shutdownCpuCount: number[];
+}
+
+export interface BayesianNode {
+  id: string;
+  label: string;
+  layer: string;
+  kind: string;
+  probability: number;
+}
+
+export interface BayesianEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface BayesianRisk {
+  id: string;
+  label: string;
+  probability: number;
+}
+
+export interface BayesianSummary {
+  cpu_throttling_probability: number;
+  service_degradation_probability: number;
+  most_at_risk_zone: string;
+  baseline_cpu_throttling_probability: number;
+  baseline_service_degradation_probability: number;
+  cpu_probability_delta: number;
+  service_probability_delta: number;
+  key_drivers: string[];
+}
+
+export interface BayesianView {
+  nodes: BayesianNode[];
+  edges: BayesianEdge[];
+  topRisks: BayesianRisk[];
+  summary: BayesianSummary;
+}
+
+export interface SimulationDiscovery {
+  focus_zone_id: string;
+  zone_peak_delta_by_zone: Record<string, number>;
+  most_impacted_zone_id: string;
+  max_zone_peak_delta_c: number;
+  baseline_zone_peak_c: number;
+  candidate_zone_peak_c: number;
+  zone_peak_delta_c: number;
+  baseline_cpu_peak_c: number;
+  candidate_cpu_peak_c: number;
+  cpu_peak_delta_c: number;
+  time_to_first_throttle_baseline_s: number | null;
+  time_to_first_throttle_candidate_s: number | null;
+  time_to_first_shutdown_baseline_s: number | null;
+  time_to_first_shutdown_candidate_s: number | null;
+}
+
+export interface SimulationRunResponse {
+  generatedAt: string;
+  durationSeconds: number;
+  dtSeconds: number;
+  timeline: SimulationTimeline;
+  discovery: SimulationDiscovery;
+  bayesian: BayesianView;
+  events: string[];
+}

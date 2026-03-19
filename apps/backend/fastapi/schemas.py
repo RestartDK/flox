@@ -286,3 +286,94 @@ class AgentChatResponse(BaseModel):
     usedFallback: bool = False
     toolEvents: list[AgentToolEvent] = Field(default_factory=list)
     pendingAction: AgentPendingAction | None = None
+
+
+class SimulationFailureInput(BaseModel):
+    componentId: str = Field(min_length=1)
+    mode: str = Field(min_length=1)
+    severity: float = Field(default=0.8, ge=0.0, le=1.0)
+    startSeconds: float = Field(default=0.0, ge=0.0)
+    endSeconds: float | None = Field(default=None, ge=0.0)
+
+
+class SimulationRunRequest(BaseModel):
+    durationSeconds: float = Field(default=600.0, ge=30.0, le=3600.0)
+    dtSeconds: float = Field(default=1.0, ge=0.2, le=10.0)
+    failures: list[SimulationFailureInput] = Field(default_factory=list)
+
+
+class SimulationTimelineView(BaseModel):
+    timesSeconds: list[float]
+    zoneTemperatures: dict[str, list[float]]
+    rowTemperatures: dict[str, list[float]]
+    zoneSupplyFlows: dict[str, list[float]]
+    zoneExhaustFlows: dict[str, list[float]]
+    nodePositionsTimeline: list[dict[str, float]]
+    maxCpuTemperature: list[float]
+    throttledCpuCount: list[int]
+    shutdownCpuCount: list[int]
+
+
+class BayesianNodeView(BaseModel):
+    id: str
+    label: str
+    layer: str
+    kind: str
+    probability: float
+
+
+class BayesianEdgeView(BaseModel):
+    source: str
+    target: str
+    weight: float
+
+
+class BayesianRiskView(BaseModel):
+    id: str
+    label: str
+    probability: float
+
+
+class BayesianSummaryView(BaseModel):
+    cpu_throttling_probability: float
+    service_degradation_probability: float
+    most_at_risk_zone: str
+    baseline_cpu_throttling_probability: float = 0.0
+    baseline_service_degradation_probability: float = 0.0
+    cpu_probability_delta: float = 0.0
+    service_probability_delta: float = 0.0
+    key_drivers: list[str] = Field(default_factory=list)
+
+
+class BayesianView(BaseModel):
+    nodes: list[BayesianNodeView]
+    edges: list[BayesianEdgeView]
+    topRisks: list[BayesianRiskView]
+    summary: BayesianSummaryView
+
+
+class DiscoveryView(BaseModel):
+    focus_zone_id: str
+    zone_peak_delta_by_zone: dict[str, float]
+    most_impacted_zone_id: str
+    max_zone_peak_delta_c: float
+    baseline_zone_peak_c: float
+    candidate_zone_peak_c: float
+    zone_peak_delta_c: float
+    baseline_cpu_peak_c: float
+    candidate_cpu_peak_c: float
+    cpu_peak_delta_c: float
+    time_to_first_throttle_baseline_s: float | None = None
+    time_to_first_throttle_candidate_s: float | None = None
+    time_to_first_shutdown_baseline_s: float | None = None
+    time_to_first_shutdown_candidate_s: float | None = None
+
+
+class SimulationRunResponse(BaseModel):
+    generatedAt: str
+    durationSeconds: float
+    dtSeconds: float
+    timeline: SimulationTimelineView
+    discovery: DiscoveryView
+    bayesian: BayesianView
+    events: list[str]
