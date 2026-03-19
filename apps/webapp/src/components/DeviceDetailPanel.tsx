@@ -23,6 +23,8 @@ const severityBadge: Record<string, string> = {
   low: 'bg-muted text-muted-foreground border-border',
 };
 
+const formatAnomalyConfidence = (value: number) => `${Math.round(value * 100)}%`;
+
 export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanelProps) {
   const { mutate: resolve, pendingFaultId } = useResolveFault();
   return (
@@ -36,7 +38,7 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
           className="absolute right-0 top-0 w-[360px] h-full z-30 border-l border-border bg-card overflow-y-auto shadow-xl"
         >
           {/* Header */}
-          <div className="px-5 py-4 border-b border-border flex items-start justify-between">
+          <div className="px-5 py-4 border-b border-border flex items-start justify-between card-accent-top">
             <div>
               <div className="font-display text-sm tracking-tight">{device.name}</div>
               <div className="text-[11px] text-muted-foreground mt-0.5">{device.id} · {device.model}</div>
@@ -53,9 +55,9 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
               <span className={`text-[13px] font-medium capitalize ${statusStyles[device.status]}`}>{device.status}</span>
             </div>
             <div className="text-right">
-              <div className="label-caps">Anomaly Score</div>
+              <div className="label-caps">Confidence Anomaly</div>
               <div className={`font-display text-lg ${device.anomalyScore > 0.7 ? 'text-status-fault' : device.anomalyScore > 0.4 ? 'text-status-warning' : 'text-status-healthy'}`}>
-                {device.anomalyScore.toFixed(2)}
+                {formatAnomalyConfidence(device.anomalyScore)}
               </div>
             </div>
           </div>
@@ -106,13 +108,13 @@ export default function DeviceDetailPanel({ device, onClose }: DeviceDetailPanel
                 {device.faults.map(fault => {
                   const isPending = pendingFaultId === fault.id;
                   return (
-                    <div key={fault.id} className={`border border-border bg-card p-3 ${isPending ? 'opacity-50' : ''}`}>
-                      <div className="text-[13px] font-medium">{fault.type}</div>
-                      <span className={`inline-block mt-1.5 px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium border ${severityBadge[fault.severity]}`}>
-                        {fault.severity}
-                      </span>
+                    <div key={fault.id} className={`border p-3 fault-card-accent ${severityBadge[fault.severity]} ${isPending ? 'opacity-50' : ''}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-display text-[12px] font-semibold">{fault.type}</span>
+                        <span className="text-[10px] uppercase tracking-wider font-medium">{fault.severity}</span>
+                      </div>
 
-                      <div className="text-[12px] leading-relaxed text-muted-foreground mt-2.5">{fault.diagnosis}</div>
+                      <div className="text-[12px] leading-relaxed opacity-90 mb-3">{fault.diagnosis}</div>
 
                       <div className="border-t border-border pt-2 mt-2.5">
                         <div className="flex items-start gap-1.5 mb-2">
