@@ -24,7 +24,6 @@ from shacklib.diagnosis_engine import (
     build_node_fault_history_payload,
     ingest_node,
     resolve_fault,
-    seed_mock_state_if_empty,
     utc_now_iso,
 )
 from shacklib.ml_inference_client import (
@@ -32,6 +31,7 @@ from shacklib.ml_inference_client import (
     infer_failure_mode_for_node,
     resolve_ml_url,
 )
+from shacklib.state_seed import seed_state_on_startup
 
 load_dotenv()
 
@@ -54,7 +54,9 @@ async def health():
 @app.on_event("startup")
 async def startup() -> None:
     ensure_storage_ready()
-    update_state(seed_mock_state_if_empty)
+    seeded = update_state(seed_state_on_startup)
+    if seeded:
+        print("[backend-fastapi] seeded reproducible startup telemetry state")
 
 
 @app.post("/api/ingest", response_model=IngestResponse)
