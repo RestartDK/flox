@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, Loader2, Send, ShieldAlert, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { type AgentChatMessage, type AgentToolEvent, type AgentPendingAction, type Device } from '@/data/mockDevices';
 import { useAgentChat } from '@/hooks/useAgentChat';
 
@@ -33,6 +35,29 @@ const toPayloadMessages = (messages: ConversationMessage[]): AgentChatMessage[] 
   }));
 
 const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const MessageMarkdown = ({ content }: { content: string }) => (
+  <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    components={{
+      p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+      ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1 last:mb-0">{children}</ul>,
+      ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1 last:mb-0">{children}</ol>,
+      li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+      code: ({ children }) => (
+        <code className="rounded-sm bg-background/70 px-1 py-0.5 font-mono text-[12px]">{children}</code>
+      ),
+      pre: ({ children }) => (
+        <pre className="mb-2 overflow-x-auto rounded-md border border-border bg-background/60 p-2 text-[12px] last:mb-0">
+          {children}
+        </pre>
+      ),
+      strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+    }}
+  >
+    {content}
+  </ReactMarkdown>
+);
 
 const extractMentionContext = (value: string, caretPosition: number): MentionContext | null => {
   const beforeCaret = value.slice(0, caretPosition);
@@ -290,17 +315,21 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`max-w-[80%] px-3 py-2 text-[13px] leading-relaxed ${
-              message.role === 'user'
-                ? 'ml-auto bg-secondary text-secondary-foreground'
-                : 'bg-muted text-foreground'
-            }`}
+            className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-              {message.role === 'assistant' ? <Bot size={11} /> : <Send size={11} />}
-              {message.role}
+            <div
+              className={`w-fit max-w-[78%] rounded-md px-3 py-2 text-[13px] ${
+                message.role === 'user'
+                  ? 'bg-secondary text-secondary-foreground'
+                  : 'bg-muted text-foreground'
+              }`}
+            >
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                {message.role === 'assistant' ? <Bot size={11} /> : <Send size={11} />}
+                {message.role}
+              </div>
+              <MessageMarkdown content={message.content} />
             </div>
-            <div>{message.content}</div>
           </div>
         ))}
 
