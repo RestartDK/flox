@@ -30,4 +30,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app /app
 USER app
-CMD ["celery", "-A", "worker.worker:app", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "worker.worker:app", "worker", "-B", "--loglevel=info", "--schedule=/tmp/celerybeat-schedule"]
