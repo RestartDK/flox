@@ -69,7 +69,8 @@ def _system_prompt() -> str:
         "Keep answers short and operationally useful.\n\n"
         "IMPORTANT: You have full ability to place phone calls via the escalate_fault tool. "
         "Never say you cannot place calls or send escalations. "
-        "When the user mentions a phone number and a fault or node, you MUST call escalate_fault. "
+        "When the user asks to escalate or call about a fault or node, you MUST call escalate_fault. "
+        "Do not ask for a phone number — it is pre-configured. "
         "If you do not know the faultId, call get_system_overview first to find it, then call escalate_fault. "
         "Do not ask for confirmation. Do not offer alternatives. Just call the tool."
     )
@@ -208,10 +209,6 @@ def _tool_definitions() -> list[dict[str, Any]]:
                         "type": "string",
                         "description": "The fault id to escalate, e.g. fault-003",
                     },
-                    "toNumber": {
-                        "type": "string",
-                        "description": "E.164 phone number to call, e.g. +34672359401",
-                    },
                     "engineerName": {
                         "type": "string",
                         "description": "Name of the engineer being called (optional, defaults to On-Site Engineer)",
@@ -221,7 +218,7 @@ def _tool_definitions() -> list[dict[str, Any]]:
                         "description": "Building name override (optional, defaults to platform building name)",
                     },
                 },
-                "required": ["faultId", "toNumber"],
+                "required": ["faultId"],
                 "additionalProperties": False,
             },
         },
@@ -529,16 +526,17 @@ def _tool_resolve_fault(arguments: dict[str, Any], actor: str) -> dict[str, Any]
     return update_state(_mutator)
 
 
+ESCALATION_PHONE_NUMBER = "+34672359401"
+
+
 def _tool_escalate_fault(arguments: dict[str, Any]) -> dict[str, Any]:
     fault_id = str(arguments.get("faultId") or "").strip()
-    to_number = str(arguments.get("toNumber") or "").strip()
+    to_number = ESCALATION_PHONE_NUMBER
     engineer_name = str(arguments.get("engineerName") or "On-Site Engineer").strip()
     building_name_override = str(arguments.get("buildingName") or "").strip()
 
     if not fault_id:
         return {"ok": False, "error": "faultId is required"}
-    if not to_number:
-        return {"ok": False, "error": "toNumber is required"}
 
     def _mutator(state: dict[str, Any]) -> dict[str, Any]:
         faults = state.get("faults") if isinstance(state.get("faults"), dict) else {}
@@ -728,9 +726,8 @@ def _pending_action_reply(name: str, arguments: dict[str, Any], action_id: str) 
         )
     if name == "escalate_fault":
         fault_id = str(arguments.get("faultId") or "unknown")
-        to_number = str(arguments.get("toNumber") or "unknown")
         return (
-            f"I am ready to call {to_number} about fault `{fault_id}`. "
+            f"I am ready to call {ESCALATION_PHONE_NUMBER} about fault `{fault_id}`. "
             f"Approve this action to place the call. Pending action id: {action_id}."
         )
     return f"I need approval before executing `{name}`. Pending action id: {action_id}."
