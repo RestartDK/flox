@@ -6,12 +6,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from schemas import (
+    AgentChatRequest,
+    AgentChatResponse,
     IngestPayload,
     IngestResponse,
     ResolveFaultRequest,
     ResolveFaultResponse,
     StatusResponse,
 )
+from shacklib.codex_agent import run_codex_agent_chat
 from shacklib.backend_state import ensure_storage_ready, update_state
 from shacklib.diagnosis_engine import (
     build_status_payload,
@@ -83,6 +86,12 @@ async def resolve(fault_id: str, payload: ResolveFaultRequest) -> ResolveFaultRe
         return update_state(_mutator)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="fault not found") from exc
+
+
+@app.post("/api/agent/chat", response_model=AgentChatResponse)
+async def agent_chat(payload: AgentChatRequest) -> AgentChatResponse:
+    response = run_codex_agent_chat(payload.model_dump(mode="python"))
+    return AgentChatResponse.model_validate(response)
 
 
 if __name__ == "__main__":

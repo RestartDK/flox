@@ -34,6 +34,10 @@ def _empty_state() -> State:
             "seedSource": None,
             "seededAt": None,
         },
+        "agent": {
+            "pendingActions": {},
+            "auditLog": [],
+        },
     }
 
 
@@ -45,6 +49,7 @@ def _normalize_state(state: Any) -> State:
     state.setdefault("faults", {})
     state.setdefault("catalog", {})
     state.setdefault("meta", {})
+    state.setdefault("agent", {})
 
     if not isinstance(state["nodes"], dict):
         state["nodes"] = {}
@@ -54,6 +59,8 @@ def _normalize_state(state: Any) -> State:
         state["catalog"] = {}
     if not isinstance(state["meta"], dict):
         state["meta"] = {}
+    if not isinstance(state["agent"], dict):
+        state["agent"] = {}
 
     state["catalog"].setdefault("deviceTemplates", [])
     state["catalog"].setdefault("zones", [])
@@ -65,6 +72,13 @@ def _normalize_state(state: Any) -> State:
     state["meta"].setdefault("lastFaultResolutionAt", None)
     state["meta"].setdefault("seedSource", None)
     state["meta"].setdefault("seededAt", None)
+
+    state["agent"].setdefault("pendingActions", {})
+    state["agent"].setdefault("auditLog", [])
+    if not isinstance(state["agent"]["pendingActions"], dict):
+        state["agent"]["pendingActions"] = {}
+    if not isinstance(state["agent"]["auditLog"], list):
+        state["agent"]["auditLog"] = []
 
     for node in state["nodes"].values():
         if not isinstance(node, dict):
