@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from shacklib.mock_facility import build_catalog, build_seed_state
@@ -255,6 +255,10 @@ def _classify_node(node: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def classify_node_heuristic(node: dict[str, Any]) -> dict[str, Any] | None:
+    return _classify_node(node)
+
+
 def _resolve_existing_fault(
     faults: dict[str, dict[str, Any]],
     fault_id: str | None,
@@ -361,7 +365,10 @@ def _propagate_parent_status(nodes: dict[str, dict[str, Any]]) -> None:
         nodes[node_id]["status"] = status
 
 
-def run_diagnosis_cycle(state: dict[str, Any]) -> dict[str, int]:
+def run_diagnosis_cycle(
+    state: dict[str, Any],
+    classifier: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
+) -> dict[str, int]:
     nodes: dict[str, dict[str, Any]] = state.setdefault("nodes", {})
     faults: dict[str, dict[str, Any]] = state.setdefault("faults", {})
 
@@ -373,7 +380,7 @@ def run_diagnosis_cycle(state: dict[str, Any]) -> dict[str, int]:
             continue
 
         processed_nodes += 1
-        diagnosis = _classify_node(node)
+        diagnosis = classifier(node) if classifier else _classify_node(node)
         if diagnosis is None:
             _clear_fault(node, faults)
             continue

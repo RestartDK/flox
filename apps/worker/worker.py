@@ -1,9 +1,12 @@
 import os
 from datetime import datetime, timezone
+from typing import Any
 
 from celery import Celery
 from dotenv import load_dotenv
-from shacklib.backend_state import update_state
+from shacklib.backend_state import read_state, update_state
+from shacklib.diagnosis_engine import classify_node_heuristic, run_diagnosis_cycle
+from shacklib.ml_inference_client import MLInferenceError, infer_failure_mode_for_node
 
 load_dotenv()
 
@@ -27,45 +30,67 @@ def utc_now_iso() -> str:
     return now.isoformat().replace("+00:00", "Z")
 
 
-def apply_classification(state: dict) -> dict[str, int]:
-    nodes: dict[str, dict] = state.setdefault("nodes", {})
-    faults: dict[str, dict] = state.setdefault("faults", {})
-    now = utc_now_iso()
+def ml_timeout_seconds() -> float:
+    raw = os.getenv("ML_TIMEOUT_SECONDS", "3")
+    try:
+        timeout = float(raw)
+    except ValueError:
+        return 3.0
+    return max(0.2, min(30.0, timeout))
 
-    processed_nodes = 0
-    open_faults = 0
+
+def collect_diagnoses(
+    state_snapshot: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any] | None], dict[str, int]]:
+    nodes = (
+        state_snapshot.get("nodes")
+        if isinstance(state_snapshot.get("nodes"), dict)
+        else {}
+    )
+    timeout = ml_timeout_seconds()
+
+    diagnoses_by_node: dict[str, dict[str, Any] | None] = {}
+    source_stats = {
+        "mlPredictions": 0,
+        "fallbackPredictions": 0,
+        "mlErrors": 0,
+    }
 
     for node_id, node in nodes.items():
+        if not isinstance(node, dict):
+            continue
         if not node.get("latestTelemetry"):
             continue
 
-        processed_nodes += 1
-        fault_id = f"fault-auto-{node_id}"
-        is_actuator = str(node.get("type", "")).lower() == "actuator"
+        node_payload = {"id": node_id, **node}
+        try:
+            inference = infer_failure_mode_for_node(
+                node_payload,
+                timeout_seconds=timeout,
+            )
+            diagnoses_by_node[node_id] = inference.get("diagnosis")
+            source_stats["mlPredictions"] += 1
+        except MLInferenceError:
+            diagnoses_by_node[node_id] = classify_node_heuristic(node_payload)
+            source_stats["fallbackPredictions"] += 1
+            source_stats["mlErrors"] += 1
 
-        faults[fault_id] = {
-            "id": fault_id,
-            "nodeId": node_id,
-            "state": "open",
-            "kind": "mock_fault",
-            "probability": 0.87 if not is_actuator else 0.93,
-            "summary": "Classification result generated for this node.",
-            "recommendedAction": "Perform a manual inspection.",
-            "openedAt": faults.get(fault_id, {}).get("openedAt", now),
-            "updatedAt": now,
-            "resolvedBy": None,
-            "note": None,
-        }
+    return diagnoses_by_node, source_stats
 
-        node["latestFaultId"] = fault_id
-        node["status"] = "critical" if is_actuator else "warning"
-        open_faults += 1
 
-    state.setdefault("meta", {})["lastClassificationAt"] = now
-    return {
-        "processedNodes": processed_nodes,
-        "openFaults": open_faults,
-    }
+def apply_classification(
+    state: dict[str, Any],
+    diagnoses_by_node: dict[str, dict[str, Any] | None] | None = None,
+) -> dict[str, int]:
+    diagnosis_lookup = diagnoses_by_node or {}
+
+    def _classifier(node: dict[str, Any]) -> dict[str, Any] | None:
+        node_id = str(node.get("id") or "")
+        if node_id in diagnosis_lookup:
+            return diagnosis_lookup[node_id]
+        return classify_node_heuristic(node)
+
+    return run_diagnosis_cycle(state, classifier=_classifier)
 
 
 @app.on_after_configure.connect
@@ -79,11 +104,18 @@ def setup_periodic_tasks(sender, **kwargs):
 
 @app.task(name="worker.run_classification")
 def run_classification() -> dict[str, int]:
-    summary = update_state(apply_classification)
+    snapshot = read_state()
+    diagnoses_by_node, source_stats = collect_diagnoses(snapshot)
+
+    summary = update_state(lambda state: apply_classification(state, diagnoses_by_node))
+    summary.update(source_stats)
+
     print(
         "[classifier-worker] "
         f"processedNodes={summary['processedNodes']} "
-        f"openFaults={summary['openFaults']}"
+        f"openFaults={summary['openFaults']} "
+        f"mlPredictions={summary['mlPredictions']} "
+        f"fallbackPredictions={summary['fallbackPredictions']}"
     )
     return summary
 
