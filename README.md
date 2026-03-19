@@ -170,3 +170,177 @@ bun x nx run ml:train
 ## Webapp Auth
 
 Auth is off by default (`VITE_REQUIRE_AUTH=false`). Set it to `true` and configure the Vite-prefixed Supabase env vars to enable session-based auth gating across all routes.
+
+## Backend State Schema (Postgres)
+
+The backend state storage is now normalized into relational tables while preserving full backward compatibility through a legacy snapshot row in `backend_state` (`id = 1`).
+
+```mermaid
+erDiagram
+    backend_state {
+        SMALLINT id PK
+        JSONB state
+        TIMESTAMPTZ updated_at
+    }
+
+    backend_storage_meta {
+        SMALLINT id PK
+        BOOLEAN bootstrapped
+        TIMESTAMPTZ updated_at
+    }
+
+    backend_state_top_level {
+        SMALLINT id PK
+        JSONB payload
+    }
+
+    backend_state_meta {
+        SMALLINT id PK
+        TEXT last_ingest_at
+        TEXT last_classification_at
+        TEXT last_fault_resolution_at
+        TEXT seed_source
+        TEXT seeded_at
+        JSONB extras
+    }
+
+    backend_catalog_meta {
+        SMALLINT id PK
+        JSONB extras
+    }
+
+    backend_agent_meta {
+        SMALLINT id PK
+        JSONB extras
+    }
+
+    backend_nodes {
+        TEXT id PK
+        TEXT label
+        TEXT type
+        TEXT status
+        DOUBLE position
+        TEXT updated_at
+        TEXT latest_fault_id
+        TEXT latest_telemetry_at
+        JSONB extras
+    }
+
+    backend_node_parents {
+        TEXT node_id FK
+        INTEGER ordinal
+        TEXT parent_id
+    }
+
+    backend_node_latest_telemetry {
+        TEXT node_id FK
+        TEXT metric
+        JSONB value
+    }
+
+    backend_node_history {
+        TEXT node_id FK
+        TEXT metric
+        INTEGER ordinal
+        TEXT point_time
+        JSONB value
+        JSONB extras
+    }
+
+    backend_faults {
+        TEXT id PK
+        TEXT node_id
+        TEXT state
+        TEXT kind
+        DOUBLE probability
+        TEXT summary
+        TEXT recommended_action
+        TEXT opened_at
+        TEXT updated_at
+        TEXT resolved_by
+        TEXT note
+        JSONB extras
+    }
+
+    backend_catalog_zones {
+        TEXT id PK
+        INTEGER ordinal
+        TEXT name
+        TEXT label
+        INTEGER x
+        INTEGER y
+        INTEGER width
+        INTEGER height
+        INTEGER health_score
+        JSONB extras
+    }
+
+    backend_catalog_ahu_units {
+        TEXT id PK
+        INTEGER ordinal
+        TEXT label
+        INTEGER x
+        INTEGER y
+        TEXT description
+        JSONB extras
+    }
+
+    backend_catalog_device_templates {
+        TEXT id PK
+        INTEGER ordinal
+        TEXT name
+        TEXT model
+        TEXT serial
+        TEXT type
+        TEXT zone
+        TEXT zone_id
+        INTEGER x
+        INTEGER y
+        TEXT installed_date
+        DOUBLE base_anomaly_score
+        TEXT airflow_direction
+        JSONB extras
+    }
+
+    backend_catalog_template_history {
+        TEXT template_id FK
+        TEXT metric
+        INTEGER ordinal
+        TEXT point_time
+        JSONB value
+        JSONB extras
+    }
+
+    backend_catalog_fault_meta {
+        TEXT device_id PK
+        TEXT estimated_impact
+        TEXT energy_waste
+        JSONB extras
+    }
+
+    backend_agent_pending_actions {
+        TEXT action_id PK
+        JSONB payload
+    }
+
+    backend_agent_audit_log {
+        BIGINT ordinal PK
+        JSONB payload
+    }
+
+    backend_nodes ||--o{ backend_node_parents : "parent links"
+    backend_nodes ||--o{ backend_node_latest_telemetry : "latest telemetry"
+    backend_nodes ||--o{ backend_node_history : "history points"
+    backend_nodes ||--o{ backend_faults : "fault timeline"
+
+    backend_catalog_device_templates ||--o{ backend_catalog_template_history : "template history"
+    backend_catalog_device_templates ||--o| backend_catalog_fault_meta : "impact metadata"
+
+    backend_agent_meta ||--o{ backend_agent_pending_actions : "pending actions"
+    backend_agent_meta ||--o{ backend_agent_audit_log : "audit events"
+```
+
+Compatibility notes:
+- `read_state()` reconstructs the original JSON contract from relational tables.
+- `update_state()` writes both relational tables and the legacy `backend_state.state` JSONB snapshot.
+- Existing API/worker/webapp consumers continue using the same state shape.

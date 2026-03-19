@@ -23,7 +23,8 @@ services:
     volumes:
       - ./.env:/app/.env
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   backend-classifier:
@@ -41,8 +42,10 @@ services:
     volumes:
       - ./.env:/app/.env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   ml-inference:
@@ -74,11 +77,14 @@ services:
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
       - ML_URL=${ML_URL:-http://ml-inference:8000}
+    command: ["celery", "-A", "worker.worker:app", "worker", "--loglevel=info"]
     volumes:
       - ./.env:/app/.env
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   minio:
@@ -173,6 +179,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-app}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-app}"
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # place .sql files in ./database/ to auto-run on first start
