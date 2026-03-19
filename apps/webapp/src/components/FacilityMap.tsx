@@ -395,10 +395,7 @@ export default function FacilityMap({ ahuUnits, devices, nodePositions, onDevice
       />
       <div className="flex-1 p-6 flex flex-col overflow-hidden">
 
-      <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+      <div
         className="border border-border bg-card overflow-hidden flex-1 relative touch-none"
         ref={containerRef}
         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
@@ -490,7 +487,7 @@ export default function FacilityMap({ ahuUnits, devices, nodePositions, onDevice
             />
           ))}
         </svg>
-      </motion.div>
+      </div>
       </div>
     </div>
   );

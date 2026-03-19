@@ -10,7 +10,7 @@ export default function Index() {
   const [activeView, setActiveView] = useState<'map' | 'alerts' | 'agent'>('map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { ahuUnits, buildingStats, devices, error, isLoading, isError, nodePositions } = useFacilityData();
+  const { ahuUnits, buildingStats, devices, error, historyByNodeId, isLoading, isError, nodePositions } = useFacilityData();
   const selectedDevice = devices.find(device => device.id === selectedDeviceId) ?? null;
 
   const handleDeviceSelect = (deviceId: string) => {
@@ -65,7 +65,7 @@ export default function Index() {
         {activeView === 'alerts' && (
           <AlertDashboard devices={devices} onNavigateToDevice={(device) => handleDeviceSelect(device.id)} />
         )}
-        {activeView === 'agent' && <AgentPanel devices={devices} />}
+        {activeView === 'agent' && <AgentPanel devices={devices} historyByNodeId={historyByNodeId} />}
 
         {activeView === 'map' && (
           <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDeviceId(null)} />
