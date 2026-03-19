@@ -12,7 +12,7 @@ for path in (str(ROOT), str(FASTAPI_DIR)):
 
 from shacklib import backend_state, codex_agent  # noqa: E402
 from shacklib.diagnosis_engine import build_status_payload  # noqa: E402
-from shacklib.mock_facility import build_seed_state  # noqa: E402
+from shacklib.mock_datacenter import build_seed_state  # noqa: E402
 
 
 def _reset_memory_state(monkeypatch, state: dict) -> None:

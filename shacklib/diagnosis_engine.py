@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
-from shacklib.mock_facility import build_catalog, build_seed_state
+from shacklib.mock_datacenter import build_catalog, build_seed_state
 
 STATUS_RANK = {
     "healthy": 0,

@@ -14,7 +14,7 @@ for path in (str(ROOT), str(FASTAPI_DIR)):
 
 import server  # noqa: E402
 from shacklib.ml_inference_client import MLInferenceError  # noqa: E402
-from shacklib.mock_facility import build_seed_state  # noqa: E402
+from shacklib.mock_datacenter import build_seed_state  # noqa: E402
 
 
 def test_ml_failure_mode_endpoint_returns_mapped_diagnosis(monkeypatch):

@@ -74,8 +74,8 @@ class DeviceView(BaseModel):
     zone: str
     zoneId: str
     status: DeviceStatus
-    x: int
-    y: int
+    x: float
+    y: float
     installedDate: str
     anomalyScore: float
     airflowDirection: AirflowDirection
@@ -93,8 +93,8 @@ class DeviceTemplateView(BaseModel):
     type: DeviceType
     zone: str
     zoneId: str
-    x: int
-    y: int
+    x: float
+    y: float
     installedDate: str
     baseAnomalyScore: float
     airflowDirection: AirflowDirection
