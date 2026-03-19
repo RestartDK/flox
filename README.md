@@ -1,4 +1,4 @@
-<img align="left" width="300" src="https://github.com/user-attachments/assets/df49b0d7-e33d-4dcf-a253-b7208e6bb8d8">
+<img align="right" width="300" src="https://github.com/user-attachments/assets/df49b0d7-e33d-4dcf-a253-b7208e6bb8d8">
 
 # Flox
 
