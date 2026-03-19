@@ -50,9 +50,10 @@ PHASE_BINS = 120
 DEFAULT_NODE_ID = "BEL-VLV-003"
 DEFAULT_DEVICE_TYPE = "valve"
 DEFAULT_PARENT_IDS = ["ahu-01"]
+DEFAULT_PROFILE = "gear_stuck"
 DEFAULT_SPEED = 1.0
 DEFAULT_BACKEND_URL = "http://backend-fastapi:5000"
-DEFAULT_TICK_MS = 50  # base tick period at speed 1.0
+DEFAULT_TICK_MS = 1000  # base tick period at speed 1.0
 
 
 # -- dataset loading ----------------------------------------------------------
@@ -178,6 +179,16 @@ def add_noise(row: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return out
 
 
+def representative_row(profile: np.ndarray) -> np.ndarray:
+    """Single deterministic row for stable classification output."""
+    row = np.mean(profile, axis=0)
+    row[-1] = np.clip(np.round(row[-1]), 0, 2)
+    row[0] = max(0.0, min(100.0, row[0]))
+    row[1] = max(0.0, min(100.0, row[1]))
+    row[4] = max(0.0, row[4])
+    return row
+
+
 # -- payload ------------------------------------------------------------------
 
 
@@ -259,12 +270,14 @@ def run(
     ).split(",")
     spd = speed or float(os.getenv("SIM_SPEED", str(DEFAULT_SPEED)))
     do_loop = loop if not os.getenv("SIM_LOOP") else os.getenv("SIM_LOOP", "1") == "1"
+    profile_name = os.getenv("SIM_PROFILE", DEFAULT_PROFILE).strip() or DEFAULT_PROFILE
 
     path = find_dataset(dataset_path or os.getenv("SIM_DATASET_PATH"))
     print(f"[simulator] dataset: {path}")
     print(f"[simulator] backend: {backend}")
     print(f"[simulator] node: {nid} ({dtype}) parents={pids}")
     print(f"[simulator] speed: {spd}x  loop: {do_loop}")
+    print(f"[simulator] profile: {profile_name}")
 
     df = load_dataset(path)
     profiles = build_profiles(df)
@@ -274,34 +287,33 @@ def run(
 
     print(f"[simulator] profiles: {list(profiles.keys())}")
 
+    selected_profile = profiles.get(profile_name)
+    if selected_profile is None:
+        selected_profile = next(iter(profiles.values()))
+        print(
+            f"[simulator] profile '{profile_name}' unavailable, using fallback profile"
+        )
+
+    stable_row = representative_row(selected_profile)
+
     wait_for_backend(backend)
     print("[simulator] backend ready, starting publish loop")
 
-    rng = np.random.default_rng(42)
     tick_s = (DEFAULT_TICK_MS / 1000.0) / max(0.1, spd)
     published = 0
     errors = 0
 
     try:
         while True:
-            for cls in CLASS_ORDER:
-                profile = profiles.get(cls)
-                if profile is None:
-                    continue
-                for step in range(PHASE_BINS):
-                    row = add_noise(profile[step], rng)
-                    payload = row_to_payload(row, nid, dtype, pids)
-                    ok = post_ingest(backend, payload)
-                    if ok:
-                        published += 1
-                    else:
-                        errors += 1
-                    if published % 50 == 0:
-                        print(
-                            f"[simulator] published={published} errors={errors} "
-                            f"class={cls} step={step}/{PHASE_BINS}"
-                        )
-                    time.sleep(tick_s)
+            payload = row_to_payload(stable_row, nid, dtype, pids)
+            ok = post_ingest(backend, payload)
+            if ok:
+                published += 1
+            else:
+                errors += 1
+            if published % 30 == 0:
+                print(f"[simulator] published={published} errors={errors}")
+            time.sleep(tick_s)
             if not do_loop:
                 break
     except KeyboardInterrupt:
