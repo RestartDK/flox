@@ -90,9 +90,33 @@ const exhaustFlowPaths = [
 ];
 
 const thermalLanes = [
-  { key: 'lane-ab', supplyId: 'BEL-VLV-003', exhaustId: 'BEL-DMP-002', supplyX: 200, hotX: 350 },
-  { key: 'lane-cd', supplyId: 'BEL-VLV-005', exhaustId: 'BEL-ACT-004', supplyX: 500, hotX: 650 },
-  { key: 'lane-ef', supplyId: 'BEL-ACT-007', exhaustId: 'BEL-DMP-006', supplyX: 800, hotX: 950 },
+  {
+    key: 'lane-ab',
+    supplyId: 'BEL-VLV-003',
+    exhaustId: 'BEL-DMP-002',
+    supplyX: 200,
+    hotX: 350,
+    coldRow: 'row_a' as const,
+    hotRow: 'row_b' as const,
+  },
+  {
+    key: 'lane-cd',
+    supplyId: 'BEL-VLV-005',
+    exhaustId: 'BEL-ACT-004',
+    supplyX: 500,
+    hotX: 650,
+    coldRow: 'row_c' as const,
+    hotRow: 'row_d' as const,
+  },
+  {
+    key: 'lane-ef',
+    supplyId: 'BEL-ACT-007',
+    exhaustId: 'BEL-DMP-006',
+    supplyX: 800,
+    hotX: 950,
+    coldRow: 'row_e' as const,
+    hotRow: 'row_f' as const,
+  },
 ] as const;
 
 const laneHeights = [258, 345, 432];
@@ -120,6 +144,9 @@ const averageFlow = (nodePositions: Record<string, number>, ids: string[]) => {
 
 const SIMULATION_INTERVAL_MS = 80;
 const PLAYBACK_WARMUP_STEPS = 18;
+const SIMULATION_DURATION_SECONDS = 300;
+const DUCT_PARTICLE_DENSITY_MULTIPLIER = 1.8;
+const THERMAL_PARTICLE_DENSITY_MULTIPLIER = 2.1;
 
 type RowId = 'row_a' | 'row_b' | 'row_c' | 'row_d' | 'row_e' | 'row_f';
 
@@ -179,6 +206,16 @@ const thermalColor = (deltaC: number) => {
   };
 };
 
+const thermalParticleColor = (temperatureC: number) => {
+  return temperatureC < 34 ? supplyPalette : exhaustPalette;
+};
+
+const thermalDriveFromAisle = (coldTempC: number, hotTempC: number) => {
+  const hotNorm = clamp01((hotTempC - 30) / 18);
+  const deltaNorm = clamp01((hotTempC - coldTempC - 6) / 12);
+  return clamp01(0.55 * hotNorm + 0.45 * deltaNorm);
+};
+
 const deviceToComponentId: Record<string, string> = {
   'BEL-ACT-001': 'act_intake',
   'BEL-DMP-002': 'dmp_ab',
@@ -225,7 +262,22 @@ const timelineAt = (series: number[] | undefined, index: number, fallback: numbe
 };
 
 const lerp = (from: number, to: number, blend: number) => from + (to - from) * blend;
-const isPulsingStatus = (status: Device['status'] | undefined) => status === 'warning' || status === 'fault';
+const isPulsingStatus = (status: Device['status'] | undefined) =>
+  status === 'warning' || status === 'fault' || status === 'offline';
+
+const statusPassthroughFactor: Record<Device['status'], number> = {
+  healthy: 1,
+  warning: 0.72,
+  fault: 0.38,
+  offline: 0.14,
+};
+
+const passthroughFromStatus = (status: Device['status'] | undefined) => {
+  if (!status) {
+    return 1;
+  }
+  return statusPassthroughFactor[status] ?? 1;
+};
 
 const DeviceNode = ({
   device,
@@ -319,7 +371,8 @@ const FlowDots = ({
   }
 
   const duration = `${Math.max(1.35, 5.5 - flow * 4)}s`;
-  const dotCount = flow >= 0.75 ? 4 : flow >= 0.35 ? 3 : 2;
+  const baseCount = flow >= 0.85 ? 6 : flow >= 0.6 ? 5 : flow >= 0.35 ? 4 : 3;
+  const dotCount = Math.min(14, Math.max(3, Math.round(baseCount * DUCT_PARTICLE_DENSITY_MULTIPLIER)));
   const durationSeconds = Number.parseFloat(duration);
 
   return (
@@ -360,7 +413,6 @@ const ThermalParticleStream = ({
   flow,
   pulsing,
   color,
-  colorEnd = color,
   radiusValues,
   durationScale = 1,
 }: {
@@ -368,7 +420,6 @@ const ThermalParticleStream = ({
   flow: number;
   pulsing: boolean;
   color: string;
-  colorEnd?: string;
   radiusValues: string;
   durationScale?: number;
 }) => {
@@ -378,7 +429,8 @@ const ThermalParticleStream = ({
 
   const durationSeconds = Math.max(4.8, 11 - flow * 6.8) * durationScale;
   const duration = `${durationSeconds}s`;
-  const particleCount = flow >= 0.8 ? 6 : flow >= 0.45 ? 4 : 2;
+  const baseCount = flow >= 1.1 ? 8 : flow >= 0.8 ? 7 : flow >= 0.45 ? 5 : 3;
+  const particleCount = Math.min(16, Math.max(3, Math.round(baseCount * THERMAL_PARTICLE_DENSITY_MULTIPLIER)));
   const burstWindow = pulsing ? durationSeconds * 0.18 : durationSeconds / particleCount;
 
   return (
@@ -391,14 +443,6 @@ const ThermalParticleStream = ({
         return (
           <circle key={`${path}-${index}`} r={3.6} fill={`hsl(${color})`} opacity={0}>
             <animateMotion dur={duration} begin={begin} repeatCount="indefinite" path={path} rotate="auto" />
-            <animate
-              attributeName="fill"
-              dur={duration}
-              begin={begin}
-              repeatCount="indefinite"
-              values={`hsl(${color});hsl(${color});hsl(${colorEnd});hsl(${colorEnd})`}
-              keyTimes="0;0.42;0.62;1"
-            />
             <animate
               attributeName="opacity"
               dur={duration}
@@ -426,21 +470,28 @@ const PortBreathing = ({
   flow,
   type,
   pulsing,
+  temperatureC,
 }: {
   flow: number;
   type: 'intake' | 'exhaust';
   pulsing: boolean;
+  temperatureC?: number;
 }) => {
   if (flow <= 0) {
     return null;
   }
 
-  const durationSeconds = Math.max(2.2, 4.4 - flow * 2);
+  const thermalDrive = temperatureC === undefined ? 0 : clamp01((temperatureC - 24) / 20);
+  const durationSeconds = Math.max(1.8, (4.4 - flow * 2) * (1 - 0.32 * thermalDrive));
   const duration = `${durationSeconds}s`;
   const isIntake = type === 'intake';
   const cx = isIntake ? 18 : 1172;
   const cy = isIntake ? 567.5 : 107.5;
-  const stroke = isIntake ? supplyPalette : exhaustPalette;
+  const stroke = temperatureC === undefined
+    ? isIntake
+      ? supplyPalette
+      : exhaustPalette
+    : thermalParticleColor(temperatureC);
   const path = isIntake ? buildIntakePortPath() : buildExhaustPortPath();
 
   return (
@@ -489,8 +540,12 @@ const PortBreathing = ({
         flow={flow}
         pulsing={pulsing}
         color={stroke}
-        radiusValues={isIntake ? '2.4;3.8;2.8;2.2' : '2.8;4.4;3.6;2.6'}
-        durationScale={0.72}
+        radiusValues={
+          isIntake
+            ? `${(2.2 + thermalDrive * 0.2).toFixed(1)};${(3.4 + thermalDrive * 0.5).toFixed(1)};${(2.6 + thermalDrive * 0.3).toFixed(1)};2.0`
+            : `${(2.6 + thermalDrive * 0.4).toFixed(1)};${(4.0 + thermalDrive * 0.9).toFixed(1)};${(3.2 + thermalDrive * 0.8).toFixed(1)};2.4`
+        }
+        durationScale={Math.max(0.5, 0.72 - thermalDrive * 0.16)}
       />
     </g>
   );
@@ -499,30 +554,50 @@ const PortBreathing = ({
 const ThermodynamicAirflow = ({
   devices,
   nodePositions,
+  rowTemperatures,
 }: {
   devices: Device[];
   nodePositions: Record<string, number>;
+  rowTemperatures: Record<RowId, number>;
 }) => {
   const deviceById = Object.fromEntries(devices.map((device) => [device.id, device]));
-  const intakeFlow = Math.min(nodePositions['ahu-01'] ?? 0, nodePositions['BEL-ACT-001'] ?? 0);
-  const exhaustPortFlow = Math.min(nodePositions['ahu-02'] ?? 0, nodePositions['BEL-DMP-008'] ?? 0);
+  const intakeFactor = passthroughFromStatus(deviceById['BEL-ACT-001']?.status);
+  const outletFactor = passthroughFromStatus(deviceById['BEL-DMP-008']?.status);
+  const intakeFlow = Math.min(nodePositions['ahu-01'] ?? 0, nodePositions['BEL-ACT-001'] ?? 0) * intakeFactor;
+  const exhaustPortFlow = Math.min(nodePositions['ahu-02'] ?? 0, nodePositions['BEL-DMP-008'] ?? 0) * outletFactor;
   const edgePulsing = isPulsingStatus(deviceById['BEL-ACT-001']?.status) || isPulsingStatus(deviceById['BEL-DMP-008']?.status);
+  const intakeTemperature = (rowTemperatures.row_a + rowTemperatures.row_c + rowTemperatures.row_e) / 3;
+  const exhaustTemperature = (rowTemperatures.row_b + rowTemperatures.row_d + rowTemperatures.row_f) / 3;
 
   return (
     <g>
-      <PortBreathing flow={intakeFlow} type="intake" pulsing={edgePulsing} />
-      <PortBreathing flow={exhaustPortFlow} type="exhaust" pulsing={edgePulsing} />
-      {thermalLanes.map(({ key, supplyId, exhaustId, supplyX, hotX }) => {
+      <PortBreathing flow={intakeFlow} type="intake" pulsing={edgePulsing} temperatureC={intakeTemperature} />
+      <PortBreathing flow={exhaustPortFlow} type="exhaust" pulsing={edgePulsing} temperatureC={exhaustTemperature} />
+      {thermalLanes.map(({ key, supplyId, exhaustId, supplyX, hotX, coldRow, hotRow }) => {
+        const supplyFactor = passthroughFromStatus(deviceById[supplyId]?.status);
+        const exhaustFactor = passthroughFromStatus(deviceById[exhaustId]?.status);
+        const laneFactor = Math.min(supplyFactor, exhaustFactor);
         const routeFlow = Math.min(
           nodePositions[supplyId] ?? 0,
           nodePositions[exhaustId] ?? 0,
           intakeFlow,
           exhaustPortFlow,
-        );
+        ) * laneFactor;
+        const coldTemp = rowTemperatures[coldRow];
+        const hotTemp = rowTemperatures[hotRow];
+        const thermalDrive = thermalDriveFromAisle(coldTemp, hotTemp);
+        const coldColor = thermalParticleColor(coldTemp);
+        const hotColor = thermalParticleColor(hotTemp);
         const pulsing = [supplyId, exhaustId].some((id) => {
           const status = deviceById[id]?.status;
           return isPulsingStatus(status);
-        });
+        }) || thermalDrive > 0.52;
+
+        const coldFlow = routeFlow * (1 + 0.22 * thermalDrive);
+        const crossFlow = routeFlow * (0.92 + 0.25 * thermalDrive);
+        const hotFlow = routeFlow * (0.88 + 0.52 * thermalDrive);
+        const hotDurationScale = Math.max(0.52, 1.22 - 0.36 * thermalDrive);
+        const coldDurationScale = Math.max(0.52, 0.95 - 0.2 * thermalDrive);
 
         return laneHeights.map((laneY) => {
           const guideKey = `${key}-${laneY}`;
@@ -554,28 +629,27 @@ const ThermodynamicAirflow = ({
               />
               <ThermalParticleStream
                 path={coldPath}
-                flow={routeFlow}
+                flow={coldFlow}
                 pulsing={pulsing}
-                color={supplyPalette}
-                radiusValues="2.2;3.4;2.8;2.2"
-                durationScale={0.9}
+                color={coldColor}
+                radiusValues={`${(2.1 + thermalDrive * 0.2).toFixed(1)};${(3.2 + thermalDrive * 0.4).toFixed(1)};${(2.7 + thermalDrive * 0.35).toFixed(1)};2.2`}
+                durationScale={coldDurationScale}
               />
               <ThermalParticleStream
                 path={crossPath}
-                flow={routeFlow * 0.92}
+                flow={crossFlow}
                 pulsing={pulsing}
-                color={supplyPalette}
-                colorEnd={exhaustPalette}
-                radiusValues="2.4;3.6;3.4;2.5"
-                durationScale={1.05}
+                color={thermalParticleColor((coldTemp + hotTemp) * 0.5)}
+                radiusValues={`${(2.3 + thermalDrive * 0.25).toFixed(1)};${(3.5 + thermalDrive * 0.7).toFixed(1)};${(3.1 + thermalDrive * 0.8).toFixed(1)};2.5`}
+                durationScale={Math.max(0.56, 1.02 - 0.26 * thermalDrive)}
               />
               <ThermalParticleStream
                 path={hotPath}
-                flow={routeFlow * 0.88}
+                flow={hotFlow}
                 pulsing={pulsing}
-                color={exhaustPalette}
-                radiusValues="3.1;4.8;4.2;3"
-                durationScale={1.28}
+                color={hotColor}
+                radiusValues={`${(2.9 + thermalDrive * 0.35).toFixed(1)};${(4.4 + thermalDrive * 1.0).toFixed(1)};${(4.0 + thermalDrive * 0.9).toFixed(1)};2.9`}
+                durationScale={hotDurationScale}
               />
             </g>
           );
@@ -593,33 +667,45 @@ const DuctAirflow = ({
   nodePositions: Record<string, number>;
 }) => {
   const deviceById = Object.fromEntries(devices.map((device) => [device.id, device]));
-  const supplyTrunkFlow = averageFlow(nodePositions, ['ahu-01', 'BEL-ACT-001', ...supplyBranchIds]);
-  const exhaustTrunkFlow = averageFlow(nodePositions, ['ahu-02', 'BEL-DMP-008', ...exhaustBranchIds]);
+  const intakeFactor = passthroughFromStatus(deviceById['BEL-ACT-001']?.status);
+  const outletFactor = passthroughFromStatus(deviceById['BEL-DMP-008']?.status);
+  const supplyTrunkFlow =
+    averageFlow(nodePositions, ['ahu-01', 'BEL-ACT-001', ...supplyBranchIds]) * intakeFactor;
+  const exhaustTrunkFlow =
+    averageFlow(nodePositions, ['ahu-02', 'BEL-DMP-008', ...exhaustBranchIds]) * outletFactor;
   const supplyPulsing = isPulsingStatus(deviceById['BEL-ACT-001']?.status);
   const exhaustPulsing = isPulsingStatus(deviceById['BEL-DMP-008']?.status);
 
   return (
     <g>
       <FlowDots d="M 10 567.5 L 840 567.5" flow={supplyTrunkFlow} color={supplyPalette} pulsing={supplyPulsing} />
-      {supplyFlowPaths.map(({ id, d }) => (
+      {supplyFlowPaths.map(({ id, d }) => {
+        const branchFactor = passthroughFromStatus(deviceById[id]?.status);
+        const branchFlow = (nodePositions[id] ?? 0) * branchFactor;
+        return (
         <FlowDots
           key={id}
           d={d}
-          flow={nodePositions[id] ?? 0}
+          flow={branchFlow}
           color={supplyPalette}
           pulsing={isPulsingStatus(deviceById[id]?.status)}
         />
-      ))}
+        );
+      })}
 
-      {exhaustFlowPaths.map(({ id, d }) => (
+      {exhaustFlowPaths.map(({ id, d }) => {
+        const branchFactor = passthroughFromStatus(deviceById[id]?.status);
+        const branchFlow = (nodePositions[id] ?? 0) * branchFactor;
+        return (
         <FlowDots
           key={id}
           d={d}
-          flow={nodePositions[id] ?? 0}
+          flow={branchFlow}
           color={exhaustPalette}
           pulsing={isPulsingStatus(deviceById[id]?.status)}
         />
-      ))}
+        );
+      })}
       <FlowDots d="M 300 107.5 L 1170 107.5" flow={exhaustTrunkFlow} color={exhaustPalette} pulsing={exhaustPulsing} />
     </g>
   );
@@ -968,7 +1054,7 @@ export default function DatacenterMap({
     setIsPlaybackRunning(false);
     try {
       const result = await simulationMutation.mutateAsync({
-        durationSeconds: 600,
+        durationSeconds: SIMULATION_DURATION_SECONDS,
         dtSeconds: 1,
         failures: buildSimulationFailures(devices),
       });
@@ -1285,7 +1371,11 @@ export default function DatacenterMap({
               />
             )}
             <DuctAirflow devices={displayDevices} nodePositions={displayNodePositions} />
-            <ThermodynamicAirflow devices={displayDevices} nodePositions={displayNodePositions} />
+            <ThermodynamicAirflow
+              devices={displayDevices}
+              nodePositions={displayNodePositions}
+              rowTemperatures={rowTemperatures}
+            />
             {displayDevices.map((device) => (
               <DeviceNode
                 key={device.id}
