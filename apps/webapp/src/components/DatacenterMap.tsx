@@ -106,9 +106,6 @@ const DeviceNode = ({
 }) => {
   const color = `hsl(${statusColor[device.status]})`;
   const position = ductDevicePositions[device.id] ?? { x: device.x, y: device.y };
-  const isHealthyValve = device.type === 'valve' && device.status === 'healthy';
-  const baseFill = isHealthyValve ? `hsl(${statusColor.healthy} / 0.24)` : 'hsl(var(--card))';
-  const accentFill = isHealthyValve ? `hsl(${statusColor.healthy} / 0.3)` : `hsl(${statusColor[device.status]} / 0.15)`;
 
   return (
     <Tooltip>
@@ -131,17 +128,6 @@ const DeviceNode = ({
               className="animate-pulse-glow"
             />
           )}
-          {isHealthyValve && (
-            <circle
-              cx={position.x}
-              cy={position.y}
-              r={18}
-              fill="none"
-              stroke={`hsl(${statusColor.healthy} / 0.55)`}
-              strokeWidth={1.2}
-              className="animate-pulse-glow"
-            />
-          )}
           {selected && (
             <circle
               cx={position.x}
@@ -152,12 +138,12 @@ const DeviceNode = ({
               strokeWidth={1.5}
             />
           )}
-          <circle cx={position.x} cy={position.y} r={12} fill={baseFill} stroke="none" />
+          <circle cx={position.x} cy={position.y} r={12} fill="hsl(var(--card))" stroke="none" />
           <circle
             cx={position.x}
             cy={position.y}
             r={12}
-            fill={accentFill}
+            fill={`hsl(${statusColor[device.status]} / 0.15)`}
             stroke={color}
             strokeWidth={1.5}
           />

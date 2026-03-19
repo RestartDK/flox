@@ -20,7 +20,7 @@ from shacklib.diagnosis_engine import (  # noqa: E402
     ingest_node,
     seed_mock_state_if_empty,
 )
-from shacklib.mock_facility import build_seed_state  # noqa: E402
+from shacklib.mock_datacenter import build_seed_state  # noqa: E402
 
 
 def test_status_endpoint_returns_aggregate_payload(monkeypatch):
@@ -35,10 +35,19 @@ def test_status_endpoint_returns_aggregate_payload(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
 
-    assert {"generatedAt", "nodes", "catalog", "historyByNodeId", "derived", "meta"} <= payload.keys()
+    assert {
+        "generatedAt",
+        "nodes",
+        "catalog",
+        "historyByNodeId",
+        "derived",
+        "meta",
+    } <= payload.keys()
     assert all("position" in node for node in payload["nodes"])
     assert len(payload["derived"]["devices"]) == 8
     assert payload["derived"]["devices"][0]["id"] == "BEL-ACT-001"
+    assert payload["derived"]["devices"][0]["name"] == "South Intake Actuator"
+    assert payload["catalog"]["ahuUnits"][0]["label"] == "SFA-01"
 
 
 def test_seed_mock_state_if_empty_only_runs_once():
@@ -110,7 +119,9 @@ def test_derived_data_stays_consistent_with_devices_and_nodes():
 
     assert stats["totalDevices"] == len(devices)
     assert stats["activeFaults"] == sum(len(device["faults"]) for device in devices)
-    assert payload["derived"]["nodePositions"]["ahu-01"] == raw_nodes["ahu-01"]["position"]
+    assert (
+        payload["derived"]["nodePositions"]["ahu-01"] == raw_nodes["ahu-01"]["position"]
+    )
 
 
 def test_backend_state_falls_back_to_memory_without_database_url(monkeypatch):

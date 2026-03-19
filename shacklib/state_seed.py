@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 
-from shacklib.mock_facility import build_catalog
+from shacklib.mock_datacenter import build_catalog
 from shacklib.node_simulator import (
     CATEGORICAL_COL,
     FIELD_MAP,
@@ -49,10 +49,16 @@ _SEVERITY_ANOMALY_SCORE = {
 
 _ZONE_TO_AHU = {
     "zone-kitchen": "ahu-01",
+    "zone-row-a": "ahu-01",
+    "zone-row-b": "ahu-01",
+    "zone-row-d": "ahu-01",
+    "zone-row-c": "ahu-02",
+    "zone-row-e": "ahu-02",
+    "zone-row-f": "ahu-02",
+    "zone-bed2": "ahu-02",
     "zone-living": "ahu-01",
     "zone-bath": "ahu-02",
     "zone-bed1": "ahu-02",
-    "zone-bed2": "ahu-02",
 }
 
 _DEVICE_TYPE_PREFIX = {

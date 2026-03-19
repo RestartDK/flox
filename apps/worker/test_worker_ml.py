@@ -12,7 +12,7 @@ for path in (str(ROOT), str(WORKER_DIR)):
         sys.path.insert(0, path)
 
 import worker  # noqa: E402
-from shacklib.mock_facility import build_seed_state  # noqa: E402
+from shacklib.mock_datacenter import build_seed_state  # noqa: E402
 
 
 def test_run_classification_uses_ml_failure_modes(monkeypatch):

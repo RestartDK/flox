@@ -13,7 +13,7 @@ for path in (str(ROOT), str(FASTAPI_DIR)):
         sys.path.insert(0, path)
 
 import server  # noqa: E402
-from shacklib.mock_facility import build_seed_state  # noqa: E402
+from shacklib.mock_datacenter import build_seed_state  # noqa: E402
 
 
 def test_node_fault_history_returns_open_and_resolved_entries(monkeypatch):
