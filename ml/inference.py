@@ -11,7 +11,10 @@ from pydantic import BaseModel, Field
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from models.arch import Model
+try:
+    from ml.models.arch import Model
+except ModuleNotFoundError:
+    from models.arch import Model
 
 
 class MLPClassifierInput(BaseModel):
@@ -154,9 +157,6 @@ class PredictionResponse(BaseModel):
 # Default weights path relative to the inference.py file location
 DEFAULT_WEIGHTS_PATH = str(Path(__file__).parent / "models" / "weights")
 
-weights_path = os.getenv("ML_LATEST_WEIGHTS_PATH", DEFAULT_WEIGHTS_PATH)
-model_file = os.getenv("ML_MODEL_FILE")
-
 checkpoint_path: Path | None = None
 model: nn.Module | Any | None = None
 checkpoint: dict[str, Any] | None = None
@@ -175,12 +175,22 @@ app = FastAPI(
 def load_checkpoint() -> None:
     global checkpoint_path, model, checkpoint, imputer, scaler, xgboost_model
 
-    if model_file:
-        checkpoint_path = Path(model_file)
+    configured_model_file = os.getenv("ML_MODEL_FILE")
+    configured_weights_path = Path(
+        os.getenv("ML_LATEST_WEIGHTS_PATH", DEFAULT_WEIGHTS_PATH)
+    )
+
+    if configured_model_file:
+        checkpoint_path = Path(configured_model_file)
         if not checkpoint_path.exists():
             raise RuntimeError(f"Specified model file not found: {checkpoint_path}")
     else:
-        weights_dir = Path(weights_path)
+        weights_dir = configured_weights_path
+        default_weights_dir = Path(DEFAULT_WEIGHTS_PATH)
+        if not weights_dir.exists() and weights_dir != default_weights_dir:
+            if default_weights_dir.exists():
+                weights_dir = default_weights_dir
+
         if not weights_dir.exists():
             raise RuntimeError(f"Weights directory does not exist: {weights_dir}")
 
@@ -194,16 +204,14 @@ def load_checkpoint() -> None:
         if not pt_files:
             pt_files = list(weights_dir.glob("**/*.pt"))
 
-        # Prefer .pkl files (XGBoost) over .pt files
-        all_files = pkl_files + pt_files
-
-        if not all_files:
+        if not pkl_files and not pt_files:
             raise RuntimeError(
                 f"No model files (.pkl or .pt) found in {weights_dir} or its subdirectories. "
                 f"Train a model first or mount weights to {weights_dir}"
             )
 
-        checkpoint_path = sorted(all_files, key=lambda p: p.stat().st_mtime)[-1]
+        preferred_files = pkl_files if pkl_files else pt_files
+        checkpoint_path = max(preferred_files, key=lambda p: p.stat().st_mtime)
 
     print(f"Loading checkpoint from: {checkpoint_path}")
 

@@ -77,7 +77,7 @@ describe('Index page', () => {
 
     expect(await screen.findByRole('heading', { name: 'Facility Overview' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Alert Dashboard' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alerts' }));
     expect(await screen.findByRole('heading', { name: 'Alert Dashboard' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Stiction Suspected'));

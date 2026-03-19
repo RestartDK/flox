@@ -1,18 +1,14 @@
-"""Tests for ML inference API endpoints"""
-
-import json
-
 import pytest
-import requests
+from fastapi.testclient import TestClient
 
-
-BASE_URL = "http://localhost:8200"
+from ml.inference import app
 
 
 @pytest.fixture
-def api_base():
-    """Base URL for API"""
-    return BASE_URL
+def client():
+    """FastAPI test client"""
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture
@@ -91,18 +87,18 @@ def normal_operation_features():
     ]
 
 
-def test_health(api_base):
+def test_health(client):
     """Test health endpoint"""
-    response = requests.get(f"{api_base}/health")
+    response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
     assert data["service"] == "ml-inference"
 
 
-def test_model_info(api_base):
+def test_model_info(client):
     """Test model info endpoint"""
-    response = requests.get(f"{api_base}/model/info")
+    response = client.get("/model/info")
     assert response.status_code == 200
     data = response.json()
     assert "model_type" in data
@@ -112,10 +108,10 @@ def test_model_info(api_base):
     assert len(data["class_names"]) > 0
 
 
-def test_tabular_classifier_prediction(api_base, normal_operation_features):
+def test_tabular_classifier_prediction(client, normal_operation_features):
     """Test tabular classifier prediction (XGBoost/MLP/LogReg)"""
     data = {"features": normal_operation_features}
-    response = requests.post(f"{api_base}/predict/mlp", json=data)
+    response = client.post("/predict/mlp", json=data)
 
     assert response.status_code == 200
     result = response.json()
@@ -134,14 +130,14 @@ def test_tabular_classifier_prediction(api_base, normal_operation_features):
     assert sum(result["probabilities"]) == pytest.approx(1.0, abs=0.01)
 
 
-def test_tabular_classifier_invalid_features(api_base):
+def test_tabular_classifier_invalid_features(client):
     """Test that invalid feature count is rejected"""
     data = {"features": [1.0, 2.0, 3.0]}  # Only 3 features instead of 57
-    response = requests.post(f"{api_base}/predict/mlp", json=data)
+    response = client.post("/predict/mlp", json=data)
     assert response.status_code == 422  # Validation error
 
 
-def test_conv1d_prediction(api_base):
+def test_conv1d_prediction(client):
     """Test Conv1D classifier prediction"""
     data = {
         "sequence": [
@@ -150,7 +146,7 @@ def test_conv1d_prediction(api_base):
             [1.2, 1.1, 1.0, 0.9] * 4,
         ]
     }
-    response = requests.post(f"{api_base}/predict/conv1d", json=data)
+    response = client.post("/predict/conv1d", json=data)
 
     # May fail if conv1d model not loaded, that's OK
     if response.status_code == 200:
@@ -159,7 +155,7 @@ def test_conv1d_prediction(api_base):
         assert "probabilities" in result
 
 
-def test_autoencoder_prediction(api_base):
+def test_autoencoder_prediction(client):
     """Test autoencoder prediction"""
     data = {
         "sequence": [
@@ -167,7 +163,7 @@ def test_autoencoder_prediction(api_base):
             [-0.3, -0.2, -0.1, 0.0] * 4,
         ]
     }
-    response = requests.post(f"{api_base}/predict/autoencoder", json=data)
+    response = client.post("/predict/autoencoder", json=data)
 
     # May fail if autoencoder model not loaded, that's OK
     if response.status_code == 200:
