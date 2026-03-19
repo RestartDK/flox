@@ -4,13 +4,15 @@ import { Bot, Check, FileText, Loader2, Plus, Send, ShieldAlert, Trash2, X, Zap 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { type AgentChatMessage, type AgentPendingAction, type AgentToolEvent, type Device } from '@/types/facility';
+import { type AgentChatMessage, type AgentPendingAction, type AgentRouteState, type AgentToolEvent, type Device } from '@/types/facility';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useDeleteDocument, useDocumentsList, useUploadDocument } from '@/hooks/useBuildingDocuments';
 import PageHeader from '@/components/PageHeader';
 
 interface AgentPanelProps {
   devices: Device[];
+  routeSeed?: AgentRouteState | null;
+  onRouteSeedConsumed?: (seedId: string) => void;
 }
 
 interface ConversationMessage {
@@ -91,13 +93,14 @@ const extractMentionContext = (value: string, caretPosition: number): MentionCon
 /*  Main AgentPanel                                                    */
 /* ------------------------------------------------------------------ */
 
-export default function AgentPanel({ devices }: AgentPanelProps) {
+export default function AgentPanel({ devices, routeSeed = null, onRouteSeedConsumed }: AgentPanelProps) {
   const navigate = useNavigate();
   const agentChat = useAgentChat();
   const inputRef = useRef<HTMLInputElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatViewportRef = useRef<HTMLDivElement>(null);
   const nodePickerRef = useRef<HTMLDivElement>(null);
+  const consumedRouteSeedIdsRef = useRef<Set<string>>(new Set());
   const documentsQuery = useDocumentsList();
   const uploadDocumentMutation = useUploadDocument();
   const deleteDocumentMutation = useDeleteDocument();
@@ -178,12 +181,13 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   }, [mentionContext?.start, mentionContext?.query]);
 
   useEffect(() => {
-    if (!chatScrollRef.current) return;
-    const container = chatScrollRef.current;
-    requestAnimationFrame(() => {
+    if (!chatViewportRef.current) return;
+    const container = chatViewportRef.current;
+    const frame = requestAnimationFrame(() => {
       container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
     });
-  }, [messages, agentChat.isPending, pendingAction?.id]);
+    return () => cancelAnimationFrame(frame);
+  }, [messages, agentChat.isPending, pendingAction?.id, latestToolEvents.length]);
 
   const knownNodeIds = useMemo(
     () => new Set(nodeSuggestions.map((node) => node.id)),
@@ -241,7 +245,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
-  const sendPrompt = (text: string) => {
+  function sendPrompt(text: string) {
     const prompt = text.trim();
     if (!prompt || agentChat.isPending) return;
 
@@ -268,7 +272,30 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
         },
       },
     );
-  };
+  }
+
+  useEffect(() => {
+    if (!routeSeed) return;
+    if (consumedRouteSeedIdsRef.current.has(routeSeed.seedId)) return;
+
+    consumedRouteSeedIdsRef.current.add(routeSeed.seedId);
+    setInput(routeSeed.seedPrompt);
+    setCaretPosition(routeSeed.seedPrompt.length);
+
+    requestAnimationFrame(() => {
+      if (!inputRef.current) return;
+      if (routeSeed.focusInput) {
+        inputRef.current.focus();
+      }
+      inputRef.current.setSelectionRange(routeSeed.seedPrompt.length, routeSeed.seedPrompt.length);
+    });
+
+    if (routeSeed.autoSubmit) {
+      sendPrompt(routeSeed.seedPrompt);
+    }
+
+    onRouteSeedConsumed?.(routeSeed.seedId);
+  }, [onRouteSeedConsumed, routeSeed, sendPrompt]);
 
   const decidePendingAction = (decision: 'approve' | 'reject') => {
     if (!pendingAction || agentChat.isPending) return;
@@ -308,7 +335,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden">
       <PageHeader title="Assistant" />
-      <div className="flex-1 overflow-y-auto">
+      <div ref={chatViewportRef} className="flex-1 overflow-y-auto">
 
       <div className="container max-w-3xl space-y-4 pt-6 pb-24">
         <div className="flex flex-wrap gap-2">
@@ -324,7 +351,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
           ))}
         </div>
 
-        <div ref={chatScrollRef} className="space-y-3">
+        <div className="space-y-3">
           {messages.map((message) => (
             <div key={message.id} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
@@ -579,21 +606,28 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
                   setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
                 }}
                 onKeyDown={(event) => {
-                  if (!mentionSuggestions.length) return;
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    setMentionCursor((c) => (c + 1) % mentionSuggestions.length);
-                    return;
+                  if (mentionSuggestions.length) {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setMentionCursor((c) => (c + 1) % mentionSuggestions.length);
+                      return;
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setMentionCursor((c) => (c === 0 ? mentionSuggestions.length - 1 : c - 1));
+                      return;
+                    }
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const selected = mentionSuggestions[mentionCursor] ?? mentionSuggestions[0];
+                      if (selected) applyMention(selected.id);
+                      return;
+                    }
                   }
-                  if (event.key === 'ArrowUp') {
+
+                  if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
-                    setMentionCursor((c) => (c === 0 ? mentionSuggestions.length - 1 : c - 1));
-                    return;
-                  }
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const selected = mentionSuggestions[mentionCursor] ?? mentionSuggestions[0];
-                    if (selected) applyMention(selected.id);
+                    sendPrompt(input);
                   }
                 }}
                 className="flex-1 bg-transparent text-[13px] outline-none"
