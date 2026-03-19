@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AppSidebar from '@/components/AppSidebar';
-import FacilityMap from '@/components/FacilityMap';
+import DatacenterMap from '@/components/DatacenterMap';
 import DeviceDetailPanel from '@/components/DeviceDetailPanel';
 import AlertDashboard from '@/components/AlertDashboard';
 import AgentPanel from '@/components/AgentPanel';
@@ -54,7 +54,7 @@ export default function Index() {
 
       <div className="relative flex flex-1 overflow-hidden">
         {activeView === 'map' && (
-          <FacilityMap
+          <DatacenterMap
             ahuUnits={ahuUnits}
             devices={devices}
             nodePositions={nodePositions}
