@@ -12,7 +12,6 @@ for path in (str(ROOT), str(WORKER_DIR)):
         sys.path.insert(0, path)
 
 import worker  # noqa: E402
-from shacklib.ml_inference_client import MLInferenceError  # noqa: E402
 from shacklib.mock_facility import build_seed_state  # noqa: E402
 
 
@@ -22,20 +21,31 @@ def test_run_classification_uses_ml_failure_modes(monkeypatch):
 
     monkeypatch.setattr(worker, "read_state", lambda: deepcopy(snapshot))
 
-    def _fake_infer(node, timeout_seconds=None):
-        if node.get("id") == "BEL-VLV-003":
-            return {
-                "diagnosis": {
-                    "status": "critical",
-                    "kind": "gear_jam_transmission_lock",
-                    "probability": 0.93,
-                    "summary": "ML detected transmission lock pattern.",
-                    "recommendedAction": "Inspect actuator gearbox and coupling.",
-                }
-            }
-        return {"diagnosis": None}
+    diagnoses = {
+        node_id: None
+        for node_id, node in snapshot["nodes"].items()
+        if node.get("latestTelemetry")
+    }
+    diagnoses["BEL-VLV-003"] = {
+        "status": "critical",
+        "kind": "gear_jam_transmission_lock",
+        "probability": 0.93,
+        "summary": "ML detected transmission lock pattern.",
+        "recommendedAction": "Inspect actuator gearbox and coupling.",
+    }
 
-    monkeypatch.setattr(worker, "infer_failure_mode_for_node", _fake_infer)
+    monkeypatch.setattr(
+        worker,
+        "collect_diagnoses",
+        lambda _snapshot: (
+            diagnoses,
+            {
+                "mlPredictions": len(diagnoses),
+                "fallbackPredictions": 0,
+                "mlErrors": 0,
+            },
+        ),
+    )
     monkeypatch.setattr(worker, "update_state", lambda mutator: mutator(live_state))
 
     summary = worker.run_classification()
@@ -56,11 +66,18 @@ def test_run_classification_falls_back_when_ml_unavailable(monkeypatch):
     live_state = deepcopy(snapshot)
 
     monkeypatch.setattr(worker, "read_state", lambda: deepcopy(snapshot))
-
-    def _raise_ml(_node, timeout_seconds=None):
-        raise MLInferenceError("downstream ml unavailable")
-
-    monkeypatch.setattr(worker, "infer_failure_mode_for_node", _raise_ml)
+    monkeypatch.setattr(
+        worker,
+        "collect_diagnoses",
+        lambda _snapshot: (
+            {},
+            {
+                "mlPredictions": 0,
+                "fallbackPredictions": 10,
+                "mlErrors": 10,
+            },
+        ),
+    )
     monkeypatch.setattr(worker, "update_state", lambda mutator: mutator(live_state))
 
     summary = worker.run_classification()
