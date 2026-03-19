@@ -1,24 +1,38 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
 from typing import Any, Callable, TypeVar
 
-import psycopg
-from psycopg.types.json import Json
+try:
+    import psycopg
+    from psycopg.types.json import Json
+except ModuleNotFoundError:  # pragma: no cover - exercised in no-DB local runs
+    psycopg = None
+    Json = None
 
 State = dict[str, Any]
 T = TypeVar("T")
 _SCHEMA_READY = False
+_MEMORY_STATE: State | None = None
 
 
 def _empty_state() -> State:
     return {
         "nodes": {},
         "faults": {},
+        "catalog": {
+            "deviceTemplates": [],
+            "zones": [],
+            "ahuUnits": [],
+            "faultMetaByDeviceId": {},
+        },
         "meta": {
             "lastIngestAt": None,
             "lastClassificationAt": None,
             "lastFaultResolutionAt": None,
+            "seedSource": None,
+            "seededAt": None,
         },
     }
 
@@ -29,18 +43,36 @@ def _normalize_state(state: Any) -> State:
 
     state.setdefault("nodes", {})
     state.setdefault("faults", {})
+    state.setdefault("catalog", {})
     state.setdefault("meta", {})
 
     if not isinstance(state["nodes"], dict):
         state["nodes"] = {}
     if not isinstance(state["faults"], dict):
         state["faults"] = {}
+    if not isinstance(state["catalog"], dict):
+        state["catalog"] = {}
     if not isinstance(state["meta"], dict):
         state["meta"] = {}
+
+    state["catalog"].setdefault("deviceTemplates", [])
+    state["catalog"].setdefault("zones", [])
+    state["catalog"].setdefault("ahuUnits", [])
+    state["catalog"].setdefault("faultMetaByDeviceId", {})
 
     state["meta"].setdefault("lastIngestAt", None)
     state["meta"].setdefault("lastClassificationAt", None)
     state["meta"].setdefault("lastFaultResolutionAt", None)
+    state["meta"].setdefault("seedSource", None)
+    state["meta"].setdefault("seededAt", None)
+
+    for node in state["nodes"].values():
+        if not isinstance(node, dict):
+            continue
+        node.setdefault("position", 0.0)
+        node.setdefault("historyByVariable", {})
+        if not isinstance(node["historyByVariable"], dict):
+            node["historyByVariable"] = {}
 
     return state
 
@@ -52,10 +84,22 @@ def _postgres_dsn() -> str:
     return database_url
 
 
+def _use_memory_storage() -> bool:
+    return not os.getenv("DATABASE_URL")
+
+
 def ensure_storage_ready() -> None:
-    global _SCHEMA_READY
+    global _MEMORY_STATE, _SCHEMA_READY
     if _SCHEMA_READY:
         return
+
+    if _use_memory_storage():
+        _MEMORY_STATE = _normalize_state(_MEMORY_STATE)
+        _SCHEMA_READY = True
+        return
+
+    if psycopg is None or Json is None:
+        raise RuntimeError("psycopg is required when DATABASE_URL is set")
 
     with psycopg.connect(_postgres_dsn(), autocommit=True) as conn:
         with conn.cursor() as cur:
@@ -82,7 +126,13 @@ def ensure_storage_ready() -> None:
 
 
 def read_state() -> State:
+    global _MEMORY_STATE
     ensure_storage_ready()
+
+    if _use_memory_storage():
+        _MEMORY_STATE = _normalize_state(_MEMORY_STATE)
+        return deepcopy(_MEMORY_STATE)
+
     with psycopg.connect(_postgres_dsn(), autocommit=False) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT state FROM backend_state WHERE id = 1")
@@ -100,7 +150,15 @@ def read_state() -> State:
 
 
 def update_state(mutator: Callable[[State], T]) -> T:
+    global _MEMORY_STATE
     ensure_storage_ready()
+
+    if _use_memory_storage():
+        _MEMORY_STATE = _normalize_state(_MEMORY_STATE)
+        result = mutator(_MEMORY_STATE)
+        _MEMORY_STATE = _normalize_state(_MEMORY_STATE)
+        return result
+
     with psycopg.connect(_postgres_dsn(), autocommit=False) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT state FROM backend_state WHERE id = 1 FOR UPDATE")

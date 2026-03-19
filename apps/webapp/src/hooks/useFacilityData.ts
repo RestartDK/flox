@@ -1,47 +1,44 @@
-import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ahuUnits,
-  buildBuildingStats,
-  buildDevicesFromNodes,
-  initialFacilityNodesResponse,
-  type FacilityNodesResponse,
+  type FacilityStatusResponse,
 } from '@/data/mockDevices';
 
-const fetchFacilityNodes = async (): Promise<FacilityNodesResponse> => {
-  const response = await fetch('/mock/nodes.json', {
+const getStatusUrl = () => {
+  const baseUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
+  return `${baseUrl ?? ''}/api/status`;
+};
+
+const fetchFacilityStatus = async (): Promise<FacilityStatusResponse> => {
+  const response = await fetch(getStatusUrl(), {
     cache: 'no-store',
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch facility nodes: ${response.status}`);
+    throw new Error(`Failed to fetch facility status: ${response.status}`);
   }
 
   return response.json();
 };
 
 export const useFacilityData = () => {
-  const query = useQuery({
-    queryKey: ['facility-nodes'],
-    queryFn: fetchFacilityNodes,
-    initialData: initialFacilityNodesResponse,
+  const query = useQuery<FacilityStatusResponse>({
+    queryKey: ['facility-status'],
+    queryFn: fetchFacilityStatus,
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
 
-  const devices = useMemo(() => buildDevicesFromNodes(query.data), [query.data]);
-  const buildingStats = useMemo(() => buildBuildingStats(devices), [devices]);
-  const nodePositions = useMemo(
-    () => Object.fromEntries(query.data.nodes.map(n => [n.id, n.position])),
-    [query.data],
-  );
+  const data = query.data;
 
   return {
     ...query,
-    ahuUnits,
-    buildingStats,
-    devices,
-    nodePositions,
-    generatedAt: query.data.generatedAt,
+    ahuUnits: data?.catalog.ahuUnits ?? [],
+    buildingStats: data?.derived.buildingStats ?? null,
+    devices: data?.derived.devices ?? [],
+    nodePositions: data?.derived.nodePositions ?? {},
+    generatedAt: data?.generatedAt ?? null,
+    catalog: data?.catalog ?? null,
+    historyByNodeId: data?.historyByNodeId ?? {},
+    meta: data?.meta ?? null,
   };
 };
