@@ -1,3 +1,5 @@
+<img align="left" width="300" src="https://github.com/user-attachments/assets/df49b0d7-e33d-4dcf-a253-b7208e6bb8d8">
+
 # Flox
 
 
@@ -22,7 +24,6 @@
 
 > **Real-time fault intelligence for HVAC actuators.** Flox ingests live telemetry from Belimo actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
 
-Built for facility managers, system integrators, and HVAC installers who need to move from reactive maintenance to data-driven operations.
 
 
 
