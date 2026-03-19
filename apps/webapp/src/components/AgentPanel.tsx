@@ -96,7 +96,7 @@ const extractMentionContext = (value: string, caretPosition: number): MentionCon
 export default function AgentPanel({ devices, routeSeed = null, onRouteSeedConsumed }: AgentPanelProps) {
   const navigate = useNavigate();
   const agentChat = useAgentChat();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const documentInputRef = useRef<HTMLInputElement>(null);
   const chatViewportRef = useRef<HTMLDivElement>(null);
   const nodePickerRef = useRef<HTMLDivElement>(null);
@@ -562,7 +562,7 @@ export default function AgentPanel({ devices, routeSeed = null, onRouteSeedConsu
             )}
 
             <form
-              className="flex items-center gap-2"
+              className="flex items-end gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 sendPrompt(input);
@@ -591,7 +591,7 @@ export default function AgentPanel({ devices, routeSeed = null, onRouteSeedConsu
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <input
+              <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(event) => {
@@ -630,7 +630,8 @@ export default function AgentPanel({ devices, routeSeed = null, onRouteSeedConsu
                     sendPrompt(input);
                   }
                 }}
-                className="flex-1 bg-transparent text-[13px] outline-none"
+                rows={3}
+                className="min-h-[72px] flex-1 resize-none bg-transparent py-1 text-[13px] leading-relaxed outline-none"
                 placeholder="Ask why a fault happened, request history, or ask to run an action"
               />
               <button
