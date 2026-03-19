@@ -1,6 +1,6 @@
 <img align="right" width="300" src="https://github.com/user-attachments/assets/df49b0d7-e33d-4dcf-a253-b7208e6bb8d8">
 
-# [Flox](https://starthack26-production.up.railway.app/)
+<h1><a href="https://starthack26-production.up.railway.app/">Flox</a></h1>
 
 
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white&labelColor=20232A)
@@ -42,13 +42,13 @@ Flox closes that gap:
 
 ## Fault types detected
 
-| Kind | Severity |
-|---|---|
-| `stiction_suspected` | Critical |
-| `high_torque_anomaly` | Warning |
-| `temperature_drift` | Warning |
-| `signal_loss` | Critical |
-| `weak_signal` | Warning |
+| Kind                  | Severity |
+| --------------------- | -------- |
+| `stiction_suspected`  | Critical |
+| `high_torque_anomaly` | Warning  |
+| `temperature_drift`   | Warning  |
+| `signal_loss`         | Critical |
+| `weak_signal`         | Warning  |
 
 ML-based classifiers (when enabled) extend coverage beyond rule thresholds.
 
@@ -171,57 +171,57 @@ Example prompts:
 
 Copy `.env.example` to `.env` and fill in the values relevant to your deployment.
 
-| Variable | Description |
-|---|---|
-| `NAME` | Project name, used as Docker container prefix |
-| `ANTHROPIC_API_KEY` | Required for the operations agent |
-| `BACKEND_PORT` | FastAPI listen port (default: 5000) |
-| `POSTGRES_*` | Database connection settings |
-| `REDIS_PORT` | Redis port |
-| `ML_URL` | URL of the ML inference service |
-| `CLASSIFIER_INTERVAL_SECONDS` | How often the classifier runs (default: 5) |
-| `BACKEND_STARTUP_SEED_MODE` | Seed mode on startup: `always` or `once` |
-| `VITE_REQUIRE_AUTH` | Enable Supabase session auth on the frontend |
-| `LOKI_PORT` / `GRAFANA_PORT` | Enable remote log aggregation |
+| Variable                      | Description                                   |
+| ----------------------------- | --------------------------------------------- |
+| `NAME`                        | Project name, used as Docker container prefix |
+| `ANTHROPIC_API_KEY`           | Required for the operations agent             |
+| `BACKEND_PORT`                | FastAPI listen port (default: 5000)           |
+| `POSTGRES_*`                  | Database connection settings                  |
+| `REDIS_PORT`                  | Redis port                                    |
+| `ML_URL`                      | URL of the ML inference service               |
+| `CLASSIFIER_INTERVAL_SECONDS` | How often the classifier runs (default: 5)    |
+| `BACKEND_STARTUP_SEED_MODE`   | Seed mode on startup: `always` or `once`      |
+| `VITE_REQUIRE_AUTH`           | Enable Supabase session auth on the frontend  |
+| `LOKI_PORT` / `GRAFANA_PORT`  | Enable remote log aggregation                 |
 
 
 ## Make targets
 
-| Target | Description |
-|---|---|
-| `make init` | First-time setup: venv, deps, env linking |
-| `make dev` | Start Vite frontend |
-| `make up` | Start core services (postgres, redis, backend, classifier, worker) |
-| `make down` | Stop all services |
-| `make run.backend` | Start FastAPI backend only |
-| `make run.worker` | Start Celery worker only |
-| `make run.ml` | Start ML inference server |
-| `make lift.ml` | Core services + ML inference |
-| `make lift.sim` | Core services + node simulator |
-| `make lift.logging` | Add Loki + Grafana log stack |
-| `make lift.mlflow` | Add MLflow experiment tracking |
-| `make etl` | Run ETL pipeline |
-| `make train` | Run model training |
-| `make fmt` | Format Python with black |
-| `make lint` | Lint with ruff |
-| `make type` | Type-check with mypy |
-| `make test` | Run pytest |
-| `make clean` | Remove caches and build artifacts |
-| `make doctor` | Verify toolchain (Python, uv, Bun, Docker) |
+| Target              | Description                                                        |
+| ------------------- | ------------------------------------------------------------------ |
+| `make init`         | First-time setup: venv, deps, env linking                          |
+| `make dev`          | Start Vite frontend                                                |
+| `make up`           | Start core services (postgres, redis, backend, classifier, worker) |
+| `make down`         | Stop all services                                                  |
+| `make run.backend`  | Start FastAPI backend only                                         |
+| `make run.worker`   | Start Celery worker only                                           |
+| `make run.ml`       | Start ML inference server                                          |
+| `make lift.ml`      | Core services + ML inference                                       |
+| `make lift.sim`     | Core services + node simulator                                     |
+| `make lift.logging` | Add Loki + Grafana log stack                                       |
+| `make lift.mlflow`  | Add MLflow experiment tracking                                     |
+| `make etl`          | Run ETL pipeline                                                   |
+| `make train`        | Run model training                                                 |
+| `make fmt`          | Format Python with black                                           |
+| `make lint`         | Lint with ruff                                                     |
+| `make type`         | Type-check with mypy                                               |
+| `make test`         | Run pytest                                                         |
+| `make clean`        | Remove caches and build artifacts                                  |
+| `make doctor`       | Verify toolchain (Python, uv, Bun, Docker)                         |
 
 
 ## Optional services
 
-| Profile | Services | Command |
-|---|---|---|
-| _(default)_ | postgres, redis, backend, classifier, worker | `make up` |
-| `ml` | + ML inference | `make lift.ml` |
-| `sim` | + node simulator | `make lift.sim` |
-| `minio` | + MinIO object storage | `make lift.minio` |
-| `tensorboard` | + TensorBoard | `make lift.tensorboard` |
-| `mlflow` | + MLflow | `make lift.mlflow` |
-| `logging` | + Loki + Grafana | `make lift.logging` |
-| `database` | + MongoDB | `make lift.database` |
+| Profile       | Services                                     | Command                 |
+| ------------- | -------------------------------------------- | ----------------------- |
+| _(default)_   | postgres, redis, backend, classifier, worker | `make up`               |
+| `ml`          | + ML inference                               | `make lift.ml`          |
+| `sim`         | + node simulator                             | `make lift.sim`         |
+| `minio`       | + MinIO object storage                       | `make lift.minio`       |
+| `tensorboard` | + TensorBoard                                | `make lift.tensorboard` |
+| `mlflow`      | + MLflow                                     | `make lift.mlflow`      |
+| `logging`     | + Loki + Grafana                             | `make lift.logging`     |
+| `database`    | + MongoDB                                    | `make lift.database`    |
 
 
 ## Database schema
