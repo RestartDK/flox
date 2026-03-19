@@ -94,7 +94,7 @@ export interface BuildingStats {
   activeFaults: number;
 }
 
-interface DeviceTemplate {
+export interface DeviceTemplate {
   id: string;
   name: string;
   model: string;
@@ -110,6 +110,39 @@ interface DeviceTemplate {
   torque: TelemetryPoint[];
   position: TelemetryPoint[];
   temperature: TelemetryPoint[];
+}
+
+export interface FaultImpactMeta {
+  estimatedImpact: string;
+  energyWaste: string;
+}
+
+export interface FacilityCatalog {
+  deviceTemplates: DeviceTemplate[];
+  zones: Zone[];
+  ahuUnits: AHUUnit[];
+  faultMetaByDeviceId: Record<string, FaultImpactMeta>;
+}
+
+export interface FacilityDerivedPayload {
+  devices: Device[];
+  buildingStats: BuildingStats;
+  nodePositions: Record<string, number>;
+}
+
+export interface FacilityMeta {
+  lastIngestAt: string | null;
+  lastClassificationAt: string | null;
+  lastFaultResolutionAt: string | null;
+  seedSource: 'mock' | null;
+  seededAt: string | null;
+}
+
+export interface FacilityStatusResponse extends FacilityNodesResponse {
+  catalog: FacilityCatalog;
+  historyByNodeId: Record<string, Record<string, TelemetryPoint[]>>;
+  derived: FacilityDerivedPayload;
+  meta: FacilityMeta;
 }
 
 const generateTelemetry = (base: number, variance: number, anomaly = false): TelemetryPoint[] => {
@@ -155,13 +188,13 @@ const toDeviceStatus = (status: LiveNodeStatus): DeviceStatus => {
   return status;
 };
 
-const defaultFaultMetaByDeviceId: Record<string, { estimatedImpact: string; energyWaste: string }> = {
+export const defaultFaultMetaByDeviceId: Record<string, FaultImpactMeta> = {
   'BEL-VLV-003': { estimatedImpact: '$1,200/day cooling inefficiency', energyWaste: '340 kWh/day' },
   'BEL-ACT-004': { estimatedImpact: '$400/day energy waste', energyWaste: '120 kWh/day' },
   'BEL-VLV-005': { estimatedImpact: '$180/day energy waste', energyWaste: '80 kWh/day' },
 };
 
-const deviceTemplates: DeviceTemplate[] = [
+export const deviceTemplates: DeviceTemplate[] = [
   {
     id: 'BEL-ACT-001', name: 'Kitchen Supply Actuator', model: 'LMV-D3', serial: 'SN-88421',
     type: 'actuator', zone: 'Kitchen', zoneId: 'zone-kitchen',
@@ -437,3 +470,36 @@ export const buildDevicesFromNodes = (response: FacilityNodesResponse): Device[]
 
 export const devices = buildDevicesFromNodes(initialFacilityNodesResponse);
 export const buildingStats = buildBuildingStats(devices);
+
+export const buildMockFacilityStatusResponse = (): FacilityStatusResponse => ({
+  generatedAt: initialFacilityNodesResponse.generatedAt,
+  nodes: initialFacilityNodesResponse.nodes,
+  catalog: {
+    deviceTemplates,
+    zones,
+    ahuUnits,
+    faultMetaByDeviceId: defaultFaultMetaByDeviceId,
+  },
+  historyByNodeId: Object.fromEntries(
+    deviceTemplates.map((template) => [
+      template.id,
+      {
+        torque: template.torque,
+        position_percent: template.position,
+        temperature: template.temperature,
+      },
+    ]),
+  ),
+  derived: {
+    devices,
+    buildingStats,
+    nodePositions: Object.fromEntries(initialFacilityNodesResponse.nodes.map((node) => [node.id, node.position])),
+  },
+  meta: {
+    lastIngestAt: null,
+    lastClassificationAt: null,
+    lastFaultResolutionAt: null,
+    seedSource: 'mock',
+    seededAt: initialFacilityNodesResponse.generatedAt,
+  },
+});

@@ -8,13 +8,37 @@ import { useFacilityData } from '@/hooks/useFacilityData';
 export default function Index() {
   const [activeView, setActiveView] = useState<'map' | 'alerts'>('map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const { buildingStats, devices, nodePositions } = useFacilityData();
+  const { ahuUnits, buildingStats, devices, error, isLoading, isError, nodePositions } = useFacilityData();
   const selectedDevice = devices.find(device => device.id === selectedDeviceId) ?? null;
 
   const handleDeviceSelect = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     setActiveView('map');
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="font-display text-sm tracking-tight">Loading facility status...</div>
+      </div>
+    );
+  }
+
+  if (isError || !buildingStats) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background p-6 text-center">
+        <div className="max-w-md border border-border bg-card p-6">
+          <div className="font-display text-sm tracking-tight text-status-fault">Backend connection required</div>
+          <div className="mt-2 text-[13px] text-muted-foreground">
+            The frontend now depends on <code>/api/status</code>. Start the FastAPI backend and refresh the page.
+          </div>
+          {error instanceof Error ? (
+            <div className="mt-3 text-[12px] text-muted-foreground">{error.message}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -23,6 +47,7 @@ export default function Index() {
       <div className="relative flex flex-1 overflow-hidden">
         {activeView === 'map' ? (
           <FacilityMap
+            ahuUnits={ahuUnits}
             devices={devices}
             nodePositions={nodePositions}
             onDeviceSelect={(device) => setSelectedDeviceId(device.id)}
