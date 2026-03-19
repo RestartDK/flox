@@ -1,11 +1,13 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
-import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Play, RotateCcw } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import PageHeader from '@/components/PageHeader';
-import { type AHUUnit, type Device } from '@/types/facility';
+import { type AHUUnit, type Device, type SimulationFailureInput, type SimulationRunResponse } from '@/types/facility';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { useSimulationRun } from '@/hooks/useSimulationRun';
 
 interface DatacenterMapProps {
   ahuUnits: AHUUnit[];
@@ -94,6 +96,114 @@ const averageFlow = (nodePositions: Record<string, number>, ids: string[]) => {
 
   return ids.reduce((sum, id) => sum + (nodePositions[id] ?? 0), 0) / ids.length;
 };
+
+const SIMULATION_INTERVAL_MS = 80;
+const PLAYBACK_WARMUP_STEPS = 18;
+
+type RowId = 'row_a' | 'row_b' | 'row_c' | 'row_d' | 'row_e' | 'row_f';
+
+const rowOverlays: Array<{ id: RowId; label: string; x: number; y: number; width: number; height: number }> = [
+  { id: 'row_a', label: 'ROW A', x: 146, y: 214, width: 108, height: 280 },
+  { id: 'row_b', label: 'ROW B', x: 296, y: 214, width: 108, height: 280 },
+  { id: 'row_c', label: 'ROW C', x: 446, y: 214, width: 108, height: 280 },
+  { id: 'row_d', label: 'ROW D', x: 596, y: 214, width: 108, height: 280 },
+  { id: 'row_e', label: 'ROW E', x: 746, y: 214, width: 108, height: 280 },
+  { id: 'row_f', label: 'ROW F', x: 896, y: 214, width: 108, height: 280 },
+];
+
+const baselineRowTemperatures: Record<RowId, number> = {
+  row_a: 22.4,
+  row_b: 31.6,
+  row_c: 22.6,
+  row_d: 31.5,
+  row_e: 22.5,
+  row_f: 32.1,
+};
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const smoothStep = (edge0: number, edge1: number, value: number) => {
+  if (edge0 === edge1) {
+    return value < edge0 ? 0 : 1;
+  }
+  const x = clamp01((value - edge0) / (edge1 - edge0));
+  return x * x * (3 - 2 * x);
+};
+
+const buildRowTemperatures = (progress: number): Record<RowId, number> => {
+  const surge = smoothStep(0.08, 0.56, progress);
+  const settle = smoothStep(0.58, 1.0, progress);
+  const pulse = Math.sin(progress * Math.PI * 8) * (1 - settle) * 0.2;
+
+  return {
+    row_a: baselineRowTemperatures.row_a + 0.8 * surge,
+    row_b: baselineRowTemperatures.row_b + 2.3 * surge + 0.7 * settle,
+    row_c: baselineRowTemperatures.row_c + 0.9 * surge,
+    row_d: baselineRowTemperatures.row_d + 2.6 * surge + 0.9 * settle,
+    row_e: baselineRowTemperatures.row_e + 6.0 * surge + 1.1 * settle + pulse,
+    row_f: baselineRowTemperatures.row_f + 11.8 * surge + 2.3 * settle + 1.5 * pulse,
+  };
+};
+
+const thermalColor = (deltaC: number) => {
+  const normalized = clamp01((deltaC + 1.0) / 14.0);
+  const hue = 198 - normalized * 182;
+  const saturation = 88;
+  const lightness = 52 - normalized * 16;
+  const alpha = 0.07 + normalized * 0.32;
+
+  return {
+    fill: `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`,
+    stroke: `hsla(${hue}, ${Math.max(45, saturation - 20)}%, ${Math.max(26, lightness - 12)}%, 0.75)`,
+  };
+};
+
+const deviceToComponentId: Record<string, string> = {
+  'BEL-ACT-001': 'act_intake',
+  'BEL-DMP-002': 'dmp_ab',
+  'BEL-VLV-003': 'vlv_ab',
+  'BEL-ACT-004': 'act_cd_exhaust',
+  'BEL-VLV-005': 'vlv_cd',
+  'BEL-DMP-006': 'dmp_ef',
+  'BEL-ACT-007': 'act_ef_supply',
+  'BEL-DMP-008': 'dmp_outlet',
+};
+
+const buildSimulationFailures = (devices: Device[]): SimulationFailureInput[] => {
+  const failures = devices.flatMap((device) => {
+    const componentId = deviceToComponentId[device.id];
+    if (!componentId) {
+      return [];
+    }
+
+    if (device.status === 'fault') {
+      const mode = device.faults[0]?.type?.toLowerCase().includes('gear') ? 'gear_stuck' : 'stuck';
+      return [{ componentId, mode, severity: Math.max(0.72, device.anomalyScore), startSeconds: 0 }];
+    }
+
+    if (device.status === 'warning') {
+      return [{ componentId, mode: 'degraded', severity: Math.max(0.38, device.anomalyScore), startSeconds: 0 }];
+    }
+
+    return [];
+  });
+
+  if (failures.length === 0) {
+    return [{ componentId: 'dmp_ef', mode: 'stuck', severity: 0.92, startSeconds: 0 }];
+  }
+
+  return failures;
+};
+
+const timelineAt = (series: number[] | undefined, index: number, fallback: number) => {
+  if (!series || series.length === 0) {
+    return fallback;
+  }
+  const safeIndex = Math.min(Math.max(index, 0), series.length - 1);
+  return series[safeIndex];
+};
+
+const lerp = (from: number, to: number, blend: number) => from + (to - from) * blend;
 
 const DeviceNode = ({
   device,
@@ -230,6 +340,40 @@ const DuctAirflow = ({ nodePositions }: { nodePositions: Record<string, number> 
   );
 };
 
+const ThermalOverlay = ({ rowTemperatures }: { rowTemperatures: Record<RowId, number> }) => (
+  <g pointerEvents="none">
+    {rowOverlays.map((row) => {
+      const deltaC = rowTemperatures[row.id] - baselineRowTemperatures[row.id];
+      const color = thermalColor(deltaC);
+
+      return (
+        <g key={row.id}>
+          <rect
+            x={row.x}
+            y={row.y}
+            width={row.width}
+            height={row.height}
+            rx={8}
+            fill={color.fill}
+            stroke={color.stroke}
+            strokeWidth={1}
+          />
+          <text
+            x={row.x + row.width / 2}
+            y={row.y + 16}
+            textAnchor="middle"
+            fontSize="10"
+            fontFamily="var(--font-display)"
+            fill="hsl(var(--foreground) / 0.86)"
+          >
+            {row.label} {rowTemperatures[row.id].toFixed(1)}C ({deltaC >= 0 ? '+' : ''}{deltaC.toFixed(1)}C)
+          </text>
+        </g>
+      );
+    })}
+  </g>
+);
+
 const DatacenterBase = () => (
   <g>
     <defs>
@@ -358,6 +502,174 @@ export default function DatacenterMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
+  const [simulationStep, setSimulationStep] = useState<number | null>(null);
+  const [simulationResult, setSimulationResult] = useState<SimulationRunResponse | null>(null);
+  const [isPlaybackRunning, setIsPlaybackRunning] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const simulationMutation = useSimulationRun();
+
+  const simulationTotalSteps = simulationResult?.timeline.timesSeconds.length ?? 0;
+  const simulationMaxIndex = Math.max(0, simulationTotalSteps - 1);
+  const simulationProgress = simulationStep === null || simulationMaxIndex === 0 ? 0 : clamp01(simulationStep / simulationMaxIndex);
+  const simulationActive = simulationStep !== null;
+  const simulationPercent = Math.round(simulationProgress * 100);
+
+  useEffect(() => {
+    if (!isPlaybackRunning || !simulationResult || simulationTotalSteps <= 1) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setSimulationStep((current) => {
+        if (current === null) {
+          return 0;
+        }
+        if (current >= simulationMaxIndex) {
+          window.clearInterval(timer);
+          setIsPlaybackRunning(false);
+          return simulationMaxIndex;
+        }
+        return current + 1;
+      });
+    }, SIMULATION_INTERVAL_MS);
+
+    return () => window.clearInterval(timer);
+  }, [isPlaybackRunning, simulationResult, simulationTotalSteps, simulationMaxIndex]);
+
+  const displayNodePositions = useMemo(() => {
+    if (!simulationActive || !simulationResult || simulationStep === null) {
+      return nodePositions;
+    }
+
+    const timeline = simulationResult.timeline.nodePositionsTimeline;
+    if (timeline.length === 0) {
+      return nodePositions;
+    }
+    const stepNodePositions = timeline[Math.min(simulationStep, timeline.length - 1)] ?? {};
+    const warmupBlend = smoothStep(0, PLAYBACK_WARMUP_STEPS, simulationStep + 1);
+    const blended: Record<string, number> = { ...nodePositions };
+    for (const [nodeId, targetValue] of Object.entries(stepNodePositions)) {
+      blended[nodeId] = lerp(nodePositions[nodeId] ?? targetValue, targetValue, warmupBlend);
+    }
+    return blended;
+  }, [nodePositions, simulationActive, simulationResult, simulationStep]);
+
+  const displayDevices = useMemo(() => {
+    if (!simulationActive) {
+      return devices;
+    }
+
+    const stress = smoothStep(0.2, 0.95, simulationProgress);
+
+    return devices.map((device): Device => {
+      if (device.id === 'BEL-DMP-006') {
+        return {
+          ...device,
+          status: 'fault',
+          anomalyScore: Math.max(device.anomalyScore, 0.94),
+        };
+      }
+
+      if (stress > 0.35 && ['BEL-DMP-008', 'BEL-ACT-004', 'BEL-ACT-007'].includes(device.id)) {
+        const status: Device['status'] = device.status === 'fault' ? 'fault' : 'warning';
+        return {
+          ...device,
+          status,
+          anomalyScore: Math.max(device.anomalyScore, 0.58 + 0.24 * stress),
+        };
+      }
+
+      return device;
+    });
+  }, [devices, simulationActive, simulationProgress]);
+
+  const rowTemperatures = useMemo(() => {
+    if (!simulationActive || !simulationResult || simulationStep === null) {
+      return buildRowTemperatures(0);
+    }
+
+    const rowTimeline = simulationResult.timeline.rowTemperatures;
+    if (!rowTimeline || Object.keys(rowTimeline).length === 0) {
+      return buildRowTemperatures(simulationProgress);
+    }
+
+    const warmupBlend = smoothStep(0, PLAYBACK_WARMUP_STEPS, simulationStep + 1);
+    const target = {
+      row_a: timelineAt(rowTimeline.row_a, simulationStep, baselineRowTemperatures.row_a),
+      row_b: timelineAt(rowTimeline.row_b, simulationStep, baselineRowTemperatures.row_b),
+      row_c: timelineAt(rowTimeline.row_c, simulationStep, baselineRowTemperatures.row_c),
+      row_d: timelineAt(rowTimeline.row_d, simulationStep, baselineRowTemperatures.row_d),
+      row_e: timelineAt(rowTimeline.row_e, simulationStep, baselineRowTemperatures.row_e),
+      row_f: timelineAt(rowTimeline.row_f, simulationStep, baselineRowTemperatures.row_f),
+    };
+
+    return {
+      row_a: lerp(baselineRowTemperatures.row_a, target.row_a, warmupBlend),
+      row_b: lerp(baselineRowTemperatures.row_b, target.row_b, warmupBlend),
+      row_c: lerp(baselineRowTemperatures.row_c, target.row_c, warmupBlend),
+      row_d: lerp(baselineRowTemperatures.row_d, target.row_d, warmupBlend),
+      row_e: lerp(baselineRowTemperatures.row_e, target.row_e, warmupBlend),
+      row_f: lerp(baselineRowTemperatures.row_f, target.row_f, warmupBlend),
+    };
+  }, [simulationActive, simulationResult, simulationStep, simulationProgress]);
+
+  const crossZoneRiseC = Math.max(
+    rowTemperatures.row_b - baselineRowTemperatures.row_b,
+    rowTemperatures.row_d - baselineRowTemperatures.row_d,
+  );
+  const localRiseC = rowTemperatures.row_f - baselineRowTemperatures.row_f;
+
+  const serviceRiskPercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.service_degradation_probability ?? 0) * 100)
+    : 0;
+  const serviceBaselinePercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.baseline_service_degradation_probability ?? 0) * 100)
+    : 0;
+  const serviceDeltaPercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.service_probability_delta ?? 0) * 100)
+    : 0;
+  const cpuRiskPercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.cpu_throttling_probability ?? 0) * 100)
+    : 0;
+  const cpuBaselinePercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.baseline_cpu_throttling_probability ?? 0) * 100)
+    : 0;
+  const cpuDeltaPercent = simulationResult
+    ? Math.round((simulationResult.bayesian.summary.cpu_probability_delta ?? 0) * 100)
+    : 0;
+  const bayesianDrivers = simulationResult?.bayesian.summary.key_drivers ?? [];
+  const bayesianExplainability = simulationResult?.bayesian.explainability ?? null;
+  const serviceExplain = bayesianExplainability?.serviceRisk;
+  const cpuExplain = bayesianExplainability?.cpuRisk;
+  const discoveryClaim = simulationResult?.discovery.discoveryClaim ?? null;
+  const counterintuitiveFinding = simulationResult?.discovery.counterintuitiveFinding ?? null;
+  const significanceScore = simulationResult?.discovery.significanceScore ?? null;
+  const discoveryEvidence = simulationResult?.discovery.evidence ?? [];
+
+  const startSimulation = async () => {
+    setSimulationError(null);
+    setIsPlaybackRunning(false);
+    try {
+      const result = await simulationMutation.mutateAsync({
+        durationSeconds: 600,
+        dtSeconds: 1,
+        failures: buildSimulationFailures(devices),
+      });
+      setSimulationResult(result);
+      setSimulationStep(0);
+      setIsPlaybackRunning(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Simulation failed';
+      setSimulationError(message);
+    }
+  };
+
+  const resetSimulation = () => {
+    setIsPlaybackRunning(false);
+    setSimulationStep(null);
+    setSimulationResult(null);
+    setSimulationError(null);
+  };
 
   const clampTransform = useCallback((x: number, y: number, scale: number) => {
     const s = Math.min(Math.max(scale, 0.45), 3.2);
@@ -407,87 +719,206 @@ export default function DatacenterMap({
       <PageHeader
         title="Datacenter Overview"
         subtitle={`Rows A-F · ${devices.length} devices`}
-        actions={<ModeToggle />}
+        actions={
+          <>
+            <Button
+              size="sm"
+              className="h-8 px-3 text-[11px] font-display"
+              onClick={startSimulation}
+              disabled={simulationMutation.isPending}
+            >
+              <Play size={13} />
+              {simulationMutation.isPending
+                ? 'Running Backend Model...'
+                : isPlaybackRunning
+                  ? `Playing ${simulationPercent}%`
+                  : simulationStep === null
+                    ? 'Run Simulation'
+                    : 'Run Again'}
+            </Button>
+            {simulationStep !== null && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-3 text-[11px] font-display"
+                onClick={resetSimulation}
+              >
+                <RotateCcw size={13} />
+                Reset
+              </Button>
+            )}
+            <ModeToggle />
+          </>
+        }
       />
       <div className="flex-1 p-6 flex flex-col overflow-hidden">
         <motion.div
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
-        className="border border-border bg-card overflow-hidden flex-1 relative touch-none"
-        ref={containerRef}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-      >
-        <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
-          <button
-            onClick={zoomIn}
-            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
-          >
-            <ZoomIn size={14} />
-          </button>
-          <button
-            onClick={zoomOut}
-            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
-          >
-            <ZoomOut size={14} />
-          </button>
-          <button
-            onClick={resetView}
-            className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
-          >
-            <Maximize size={14} />
-          </button>
-        </div>
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+          className="border border-border bg-card overflow-hidden flex-1 relative touch-none"
+          ref={containerRef}
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        >
+          <div className="absolute top-3 right-3 z-10 flex flex-col gap-1">
+            <button
+              onClick={zoomIn}
+              className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button
+              onClick={zoomOut}
+              className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              onClick={resetView}
+              className="w-8 h-8 flex items-center justify-center bg-card border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors shadow-sm"
+            >
+              <Maximize size={14} />
+            </button>
+          </div>
 
-        <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted-foreground font-display bg-card/90 px-2 py-1 border border-border rounded-md shadow-sm">
-          {Math.round(transform.scale * 100)}%
-        </div>
+          {simulationStep !== null && (
+            <div className="absolute top-3 left-3 z-10 w-[350px] max-w-[calc(100%-120px)] bg-card/95 border border-border rounded-md px-3 py-2 shadow-sm">
+              <div className="flex items-center justify-between gap-3 text-[11px] font-display">
+                <span>Backend Multiphysics + Bayesian Simulation</span>
+                <span className="text-muted-foreground">{simulationPercent}%</span>
+              </div>
+              <div className="mt-1.5 h-1.5 bg-muted rounded-sm overflow-hidden">
+                <div
+                  className="h-full bg-[hsl(var(--status-fault))] transition-[width] duration-75"
+                  style={{ width: `${simulationPercent}%` }}
+                />
+              </div>
+              <div className="mt-2 text-[10px] text-muted-foreground leading-tight">
+                Thermal signal: local Row F hot aisle +{localRiseC.toFixed(1)}C and cross-zone hot aisle rise +{crossZoneRiseC.toFixed(1)}C.
+              </div>
+              {simulationResult && (
+                <>
+                  {discoveryClaim && (
+                    <div className="mt-1 text-[10px] leading-tight text-foreground/90">
+                      Discovery claim: {discoveryClaim}
+                    </div>
+                  )}
+                  {counterintuitiveFinding && (
+                    <div className="mt-1 text-[10px] leading-tight text-[hsl(var(--status-warning))]">
+                      Counterintuitive: {counterintuitiveFinding}
+                    </div>
+                  )}
+                  {typeof significanceScore === 'number' && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Significance score: {significanceScore.toFixed(1)} / 100
+                      {typeof simulationResult.discovery.pValue === 'number' && (
+                        <span>{` · p=${simulationResult.discovery.pValue.toFixed(4)}`}</span>
+                      )}
+                      {typeof simulationResult.discovery.effectSize === 'number' && (
+                        <span>{` · effect=${simulationResult.discovery.effectSize.toFixed(2)}`}</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                    Bayesian impact: service risk {serviceBaselinePercent}% to {serviceRiskPercent}% ({serviceDeltaPercent >= 0 ? '+' : ''}{serviceDeltaPercent}pp),
+                    CPU throttling risk {cpuBaselinePercent}% to {cpuRiskPercent}% ({cpuDeltaPercent >= 0 ? '+' : ''}{cpuDeltaPercent}pp).
+                  </div>
+                  {serviceExplain && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Why service risk changed: {serviceExplain.interpretation}
+                    </div>
+                  )}
+                  {serviceExplain?.topContributors?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Top contributor: {serviceExplain.topContributors[0].sourceLabel} (
+                      {Math.round(serviceExplain.topContributors[0].baselineContribution * 100)}% to {Math.round(serviceExplain.topContributors[0].candidateContribution * 100)}% weighted influence).
+                    </div>
+                  )}
+                  {serviceExplain?.strongestPaths?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Strongest path: {serviceExplain.strongestPaths[0].path} (score {serviceExplain.strongestPaths[0].score.toFixed(2)}).
+                    </div>
+                  )}
+                  {cpuExplain?.strongestPaths?.[0] && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      CPU path support: {cpuExplain.strongestPaths[0].path} (score {cpuExplain.strongestPaths[0].score.toFixed(2)}).
+                    </div>
+                  )}
+                  <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                    Most at-risk zone: {simulationResult.bayesian.summary.most_at_risk_zone.replace('_', ' ')}.
+                  </div>
+                  {discoveryEvidence.length > 0 && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Evidence: {counterintuitiveFinding ? (discoveryEvidence[1] ?? discoveryEvidence[0]) : discoveryEvidence[0]}
+                    </div>
+                  )}
+                  {bayesianDrivers.length > 0 && (
+                    <div className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                      Key drivers: {bayesianDrivers.join(', ')}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
-        <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-card px-3 py-1.5 border border-border rounded-md shadow-sm">
-          {['healthy', 'warning', 'fault'].map((status) => (
-            <span key={status} className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `hsl(${statusColor[status]})` }} />
-              <span className="capitalize">{status}</span>
-            </span>
-          ))}
-          <span className="border-l border-border pl-3 flex items-center gap-2.5">
-            {(['actuator', 'damper', 'valve'] as const).map((type, index) => (
-              <span key={type} className="flex items-center gap-1">
-                <svg width={14} height={14} viewBox="-7 -7 14 14">
-                  <DeviceIconSVG type={type} color="currentColor" />
-                </svg>
-                <span>{['Act', 'Dmp', 'Vlv'][index]}</span>
+          {simulationError && (
+            <div className="absolute top-3 left-3 z-10 max-w-[calc(100%-120px)] bg-card/95 border border-status-fault rounded-md px-3 py-2 shadow-sm text-[11px]">
+              <span className="text-status-fault font-display">Simulation failed:</span>{' '}
+              <span className="text-muted-foreground">{simulationError}</span>
+            </div>
+          )}
+
+          <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted-foreground font-display bg-card/90 px-2 py-1 border border-border rounded-md shadow-sm">
+            {Math.round(transform.scale * 100)}%{simulationActive ? ' · simulation' : ''}
+          </div>
+
+          <div className="absolute bottom-3 right-3 z-10 flex items-center gap-3 text-[10px] text-muted-foreground bg-card px-3 py-1.5 border border-border rounded-md shadow-sm">
+            {['healthy', 'warning', 'fault'].map((status) => (
+              <span key={status} className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `hsl(${statusColor[status]})` }} />
+                <span className="capitalize">{status}</span>
               </span>
             ))}
-          </span>
-          <span className="border-l border-border pl-3 flex items-center gap-2">
-            <span className="w-4 h-1 rounded-full" style={{ backgroundColor: `hsl(${supplyPalette})` }} />
-            <span>Supply</span>
-            <span className="w-4 h-1 rounded-full ml-2" style={{ backgroundColor: `hsl(${exhaustPalette})` }} />
-            <span>Exhaust</span>
-          </span>
-        </div>
+            <span className="border-l border-border pl-3 flex items-center gap-2.5">
+              {(['actuator', 'damper', 'valve'] as const).map((type, index) => (
+                <span key={type} className="flex items-center gap-1">
+                  <svg width={14} height={14} viewBox="-7 -7 14 14">
+                    <DeviceIconSVG type={type} color="currentColor" />
+                  </svg>
+                  <span>{['Act', 'Dmp', 'Vlv'][index]}</span>
+                </span>
+              ))}
+            </span>
+            <span className="border-l border-border pl-3 flex items-center gap-2">
+              <span className="w-4 h-1 rounded-full" style={{ backgroundColor: `hsl(${supplyPalette})` }} />
+              <span>Supply</span>
+              <span className="w-4 h-1 rounded-full ml-2" style={{ backgroundColor: `hsl(${exhaustPalette})` }} />
+              <span>Exhaust</span>
+            </span>
+          </div>
 
-        <svg
-          viewBox="0 0 1200 700"
-          className="w-full h-full"
-          style={{
-            transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
-            transformOrigin: 'center center',
-            transition: 'none',
-          }}
-        >
-          <DatacenterBase />
-          <DuctAirflow nodePositions={nodePositions} />
-          {devices.map((device) => (
-            <DeviceNode
-              key={device.id}
-              device={device}
-              selected={device.id === selectedDeviceId}
-              onClick={() => onDeviceSelect(device)}
-            />
-          ))}
-        </svg>
+          <svg
+            viewBox="0 0 1200 700"
+            className="w-full h-full"
+            style={{
+              transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
+              transformOrigin: 'center center',
+              transition: 'none',
+            }}
+          >
+            <DatacenterBase />
+            {simulationStep !== null && <ThermalOverlay rowTemperatures={rowTemperatures} />}
+            <DuctAirflow nodePositions={displayNodePositions} />
+            {displayDevices.map((device) => (
+              <DeviceNode
+                key={device.id}
+                device={device}
+                selected={device.id === selectedDeviceId}
+                onClick={() => onDeviceSelect(device)}
+              />
+            ))}
+          </svg>
         </motion.div>
       </div>
     </div>

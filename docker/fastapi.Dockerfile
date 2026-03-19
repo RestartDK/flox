@@ -22,6 +22,12 @@ RUN touch README.md \
 
 # Copy application source last - most frequently changed
 COPY apps/backend/fastapi/ ./apps/backend/fastapi/
+COPY ml/__init__.py ./ml/__init__.py
+COPY ml/simulation/ ./ml/simulation/
+COPY ml/bayesian/ ./ml/bayesian/
+
+# Ensure runtime imports can resolve ml/* modules.
+ENV PYTHONPATH=/app
 
 WORKDIR /app/apps/backend/fastapi
 

@@ -12,11 +12,14 @@ from schemas import (
     AgentChatResponse,
     DocumentListItem,
     DocumentUploadResponse,
+    BayesianView,
     IngestPayload,
     IngestResponse,
     MlFailureModeRequest,
     MlFailureModeResponse,
     NodeFaultHistoryResponse,
+    SimulationRunRequest,
+    SimulationRunResponse,
     ResolveFaultRequest,
     ResolveFaultResponse,
     StatusResponse,
@@ -31,6 +34,11 @@ from shacklib.backend_state import (
     set_building_document_content,
     update_state,
 )
+from ml.bayesian import (
+    build_component_failure_priors,
+    run_datacenter_inference,
+    serialize_bayesian_result,
+)
 from shacklib.codex_agent import run_codex_agent_chat
 from shacklib.diagnosis_engine import (
     build_status_payload,
@@ -44,6 +52,7 @@ from shacklib.ml_inference_client import (
     infer_failure_mode_for_node,
     resolve_ml_url,
 )
+from shacklib.simulation_service import run_simulation_bundle
 from shacklib.state_seed import seed_state_on_startup
 
 load_dotenv()
@@ -275,6 +284,32 @@ async def ml_failure_mode(payload: MlFailureModeRequest) -> MlFailureModeRespons
 async def agent_chat(payload: AgentChatRequest) -> AgentChatResponse:
     response = run_codex_agent_chat(payload.model_dump(mode="python"))
     return AgentChatResponse.model_validate(response)
+
+
+@app.post("/api/simulation/run", response_model=SimulationRunResponse)
+async def run_simulation(payload: SimulationRunRequest) -> SimulationRunResponse:
+    status_payload = update_state(build_status_payload)
+    response = run_simulation_bundle(
+        duration_seconds=payload.durationSeconds,
+        dt_seconds=payload.dtSeconds,
+        failures_payload=[item.model_dump(mode="python") for item in payload.failures],
+        status_payload=status_payload,
+        generated_at=utc_now_iso(),
+    )
+    return SimulationRunResponse.model_validate(response)
+
+
+@app.get("/api/bayesian/current", response_model=BayesianView)
+async def bayesian_current() -> BayesianView:
+    status_payload = update_state(build_status_payload)
+    priors = build_component_failure_priors(
+        requested_failures=[],
+        status_payload=status_payload,
+    )
+    bayesian = serialize_bayesian_result(
+        run_datacenter_inference(component_failure_priors=priors, simulation_context={})
+    )
+    return BayesianView.model_validate(bayesian)
 
 
 if __name__ == "__main__":

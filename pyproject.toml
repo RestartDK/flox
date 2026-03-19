@@ -15,6 +15,7 @@ dependencies = [
   "fastapi",
   "flask",
   "flask-cors",
+  "matplotlib",
   "numpy",
   "pandas",
   "pydantic",
