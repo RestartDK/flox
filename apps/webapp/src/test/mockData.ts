@@ -4,6 +4,7 @@
  */
 import type {
   AHUUnit,
+  BuildingDocumentListItem,
   BuildingStats,
   Device,
   DeviceTemplate,

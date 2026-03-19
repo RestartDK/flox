@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, Clock3, Loader2, Send, ShieldAlert, Thermometer, X, Zap } from 'lucide-react';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Check, Clock3, FileText, Loader2, Plus, Send, ShieldAlert, Thermometer, Trash2, X, Zap } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -7,6 +7,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type AgentChatMessage, type AgentPendingAction, type AgentToolEvent, type Device, type TelemetryPoint } from '@/types/facility';
 import { useAgentChat } from '@/hooks/useAgentChat';
+import { useDeleteDocument, useDocumentsList, useUploadDocument } from '@/hooks/useBuildingDocuments';
 import { useResolveFault } from '@/hooks/useFacilityData';
 
 interface AgentPanelProps {
@@ -339,7 +340,11 @@ function TelemetryTabContent({
 export default function AgentPanel({ devices, historyByNodeId = {} }: AgentPanelProps) {
   const agentChat = useAgentChat();
   const inputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const documentsQuery = useDocumentsList();
+  const uploadDocumentMutation = useUploadDocument();
+  const deleteDocumentMutation = useDeleteDocument();
 
   const [activeTab, setActiveTab] = useState('chat');
   const [messages, setMessages] = useState<ConversationMessage[]>([
@@ -641,248 +646,351 @@ export default function AgentPanel({ devices, historyByNodeId = {} }: AgentPanel
     );
   };
 
+  const handleDocumentSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    event.currentTarget.value = '';
+
+    if (!file || uploadDocumentMutation.isPending) {
+      return;
+    }
+
+    uploadDocumentMutation.mutate(file);
+  };
+
+  const documents = documentsQuery.data ?? [];
+  const pendingUploadName = uploadDocumentMutation.isPending
+    ? uploadDocumentMutation.variables?.name ?? 'Uploading document'
+    : null;
+
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-      <div className="flex items-center justify-between gap-4 px-6 py-4">
-        <div>
-          <h1 className="font-display text-sm tracking-tight">Operations Agent</h1>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {topFault ? `${topFault.device.id} - ${topFault.device.name}` : 'Diagnosis, fault history, and approved actions.'}
-          </p>
-        </div>
-        <select
-          value={historyNodeId ?? ''}
-          onChange={(e) => setHistoryNodeId(e.target.value || null)}
-          className="h-8 min-w-[200px] border border-border bg-background px-2 text-[12px] outline-none shrink-0"
-        >
-          {nodeSuggestions.map((node) => (
-            <option key={node.id} value={node.id}>{node.id} - {node.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="px-6">
-          <TabsList>
-            <TabsTrigger value="chat">Chat</TabsTrigger>
-            <TabsTrigger value="faults" className="inline-flex items-center gap-1.5">
-              Faults
-              {activeFaultCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-medium bg-status-fault/15 text-status-fault rounded-sm">
-                  {activeFaultCount}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="telemetry">Telemetry</TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="chat" className="mt-4">
-          <div className="container max-w-3xl space-y-4 pb-24">
-            <div className="flex flex-wrap gap-2">
-              {quickPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  onClick={() => sendPrompt(prompt)}
-                  disabled={agentChat.isPending}
-                  className="border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-
-            <div ref={chatScrollRef} className="space-y-3">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`w-fit max-w-[78%] rounded-md px-3 py-2 text-[13px] ${
-                      message.role === 'user'
-                        ? 'bg-secondary text-secondary-foreground'
-                        : 'bg-muted text-foreground'
-                    }`}
-                  >
-                    <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {message.role === 'assistant' ? <Bot size={11} /> : <Send size={11} />}
-                      {message.role}
-                    </div>
-                    <MessageMarkdown content={message.content} />
-
-                    {message.role === 'assistant' && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {buildMessageActions(message.content).map((action) => (
-                          <button
-                            key={`${message.id}-${action.key}`}
-                            type="button"
-                            disabled={agentChat.isPending}
-                            onClick={() => runMessageAction(action)}
-                            className={`border px-2 py-1 text-[11px] transition-colors disabled:opacity-50 ${
-                              action.style === 'primary'
-                                ? 'border-foreground/30 bg-foreground/5 text-foreground hover:border-foreground/60'
-                                : action.style === 'danger'
-                                  ? 'border-status-fault/40 bg-status-fault/10 text-status-fault hover:border-status-fault/70'
-                                  : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {action.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {agentChat.isPending && (
-                <div className="inline-flex items-center gap-2 px-3 py-2 text-[12px] bg-muted text-muted-foreground">
-                  <Loader2 size={13} className="animate-spin" />
-                  Agent working...
-                </div>
-              )}
-            </div>
-
-            {latestToolEvents.length > 0 && (
-              <div className="border border-border bg-card p-3">
-                <div className="label-caps mb-2">Latest tool activity</div>
-                <div className="space-y-1.5">
-                  {latestToolEvents.map((event, index) => (
-                    <div key={`${event.name}-${index}`} className="text-[12px] text-muted-foreground">
-                      <span className="font-medium text-foreground">{event.name}</span>
-                      <span className="mx-1">-</span>
-                      <span className="capitalize">{event.outcome.replace('_', ' ')}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {pendingAction && (
-              <div className="border border-status-warning/40 bg-status-warning/10 p-3">
-                <div className="flex items-center gap-2 text-status-warning text-[12px] uppercase tracking-wider font-medium">
-                  <ShieldAlert size={14} />
-                  Approval required
-                </div>
-                <div className="mt-1 text-[13px] text-foreground">{pendingAction.summary}</div>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={() => decidePendingAction('approve')}
-                    disabled={agentChat.isPending}
-                    className="inline-flex items-center gap-1.5 border border-status-healthy/40 bg-status-healthy/15 px-3 py-1.5 text-[12px] text-status-healthy disabled:opacity-50"
-                  >
-                    <Check size={12} />
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => decidePendingAction('reject')}
-                    disabled={agentChat.isPending}
-                    className="inline-flex items-center gap-1.5 border border-status-fault/40 bg-status-fault/15 px-3 py-1.5 text-[12px] text-status-fault disabled:opacity-50"
-                  >
-                    <X size={12} />
-                    Reject
-                  </button>
-                </div>
-              </div>
-            )}
-
+        <div className="flex items-center justify-between gap-4 px-6 py-4">
+          <div>
+            <h1 className="font-display text-sm tracking-tight">Operations Agent</h1>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {topFault ? `${topFault.device.id} - ${topFault.device.name}` : 'Diagnosis, fault history, and approved actions.'}
+            </p>
           </div>
-        </TabsContent>
+          <select
+            value={historyNodeId ?? ''}
+            onChange={(e) => setHistoryNodeId(e.target.value || null)}
+            className="h-8 min-w-[200px] border border-border bg-background px-2 text-[12px] outline-none shrink-0"
+          >
+            {nodeSuggestions.map((node) => (
+              <option key={node.id} value={node.id}>{node.id} - {node.name}</option>
+            ))}
+          </select>
+        </div>
 
-        <TabsContent value="faults" className="mt-4 px-6">
-          <FaultsTabContent devices={devices} selectedNodeId={historyNodeId} />
-        </TabsContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="px-6">
+            <TabsList>
+              <TabsTrigger value="chat">Chat</TabsTrigger>
+              <TabsTrigger value="faults" className="inline-flex items-center gap-1.5">
+                Faults
+                {activeFaultCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-medium bg-status-fault/15 text-status-fault rounded-sm">
+                    {activeFaultCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="telemetry">Telemetry</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="telemetry" className="mt-4 px-6">
-          <TelemetryTabContent
-            devices={devices}
-            historyByNodeId={historyByNodeId}
-            selectedNodeId={historyNodeId}
-          />
-        </TabsContent>
-      </Tabs>
-      </div>
+          <TabsContent value="chat" className="mt-4">
+            <div className="container max-w-3xl space-y-4 pb-24">
+              <div className="flex flex-wrap gap-2">
+                {quickPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => sendPrompt(prompt)}
+                    disabled={agentChat.isPending}
+                    className="border border-border bg-card px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
 
-      {activeTab === 'chat' && <div className="shrink-0 bg-background pb-4 pt-2 px-6">
-        <div className="container max-w-3xl">
-          <div className="border border-border bg-card px-4 py-3">
-            <form
-              className="flex items-center gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                sendPrompt(input);
-              }}
-            >
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(event) => {
-                  setInput(event.target.value);
-                  setCaretPosition(event.target.selectionStart ?? event.target.value.length);
-                }}
-                onClick={(event) => {
-                  setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
-                }}
-                onKeyUp={(event) => {
-                  setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
-                }}
-                onKeyDown={(event) => {
-                  if (!mentionSuggestions.length) return;
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    setMentionCursor((c) => (c + 1) % mentionSuggestions.length);
-                    return;
-                  }
-                  if (event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    setMentionCursor((c) => (c === 0 ? mentionSuggestions.length - 1 : c - 1));
-                    return;
-                  }
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    const selected = mentionSuggestions[mentionCursor] ?? mentionSuggestions[0];
-                    if (selected) applyMention(selected.id);
-                  }
-                }}
-                className="flex-1 bg-transparent text-[13px] outline-none"
-                placeholder="Ask why a fault happened, request history, or ask to run an action"
-              />
-              <button
-                type="submit"
-                disabled={agentChat.isPending || !input.trim()}
-                className="inline-flex items-center gap-1.5 border border-border px-3 py-1.5 text-[12px] hover:border-foreground transition-colors disabled:opacity-50"
-              >
-                <Send size={12} />
-                Send
-              </button>
-            </form>
-
-            {mentionSuggestions.length > 0 && (
-              <div className="mt-2 border border-border bg-background p-2">
-                <div className="label-caps mb-1">Node mentions</div>
-                <div className="space-y-1">
-                  {mentionSuggestions.map((node, index) => (
-                    <button
-                      key={node.id}
-                      type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        applyMention(node.id);
-                      }}
-                      className={`w-full text-left px-2 py-1 text-[12px] transition-colors ${
-                        mentionCursor === index ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'
+              <div ref={chatScrollRef} className="space-y-3">
+                {messages.map((message) => (
+                  <div key={message.id} className={`flex w-full ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`w-fit max-w-[78%] rounded-md px-3 py-2 text-[13px] ${
+                        message.role === 'user'
+                          ? 'bg-secondary text-secondary-foreground'
+                          : 'bg-muted text-foreground'
                       }`}
                     >
-                      <span className="font-medium text-foreground">@{node.id}</span>
-                      <span className="mx-2">-</span>
-                      <span>{node.name}</span>
-                    </button>
-                  ))}
+                      <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        {message.role === 'assistant' ? <Bot size={11} /> : <Send size={11} />}
+                        {message.role}
+                      </div>
+                      <MessageMarkdown content={message.content} />
+
+                      {message.role === 'assistant' && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {buildMessageActions(message.content).map((action) => (
+                            <button
+                              key={`${message.id}-${action.key}`}
+                              type="button"
+                              disabled={agentChat.isPending}
+                              onClick={() => runMessageAction(action)}
+                              className={`border px-2 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                                action.style === 'primary'
+                                  ? 'border-foreground/30 bg-foreground/5 text-foreground hover:border-foreground/60'
+                                  : action.style === 'danger'
+                                    ? 'border-status-fault/40 bg-status-fault/10 text-status-fault hover:border-status-fault/70'
+                                    : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {agentChat.isPending && (
+                  <div className="inline-flex items-center gap-2 px-3 py-2 text-[12px] bg-muted text-muted-foreground">
+                    <Loader2 size={13} className="animate-spin" />
+                    Agent working...
+                  </div>
+                )}
+              </div>
+
+              {latestToolEvents.length > 0 && (
+                <div className="border border-border bg-card p-3">
+                  <div className="label-caps mb-2">Latest tool activity</div>
+                  <div className="space-y-1.5">
+                    {latestToolEvents.map((event, index) => (
+                      <div key={`${event.name}-${index}`} className="text-[12px] text-muted-foreground">
+                        <span className="font-medium text-foreground">{event.name}</span>
+                        <span className="mx-1">-</span>
+                        <span className="capitalize">{event.outcome.replace('_', ' ')}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {pendingAction && (
+                <div className="border border-status-warning/40 bg-status-warning/10 p-3">
+                  <div className="flex items-center gap-2 text-status-warning text-[12px] uppercase tracking-wider font-medium">
+                    <ShieldAlert size={14} />
+                    Approval required
+                  </div>
+                  <div className="mt-1 text-[13px] text-foreground">{pendingAction.summary}</div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => decidePendingAction('approve')}
+                      disabled={agentChat.isPending}
+                      className="inline-flex items-center gap-1.5 border border-status-healthy/40 bg-status-healthy/15 px-3 py-1.5 text-[12px] text-status-healthy disabled:opacity-50"
+                    >
+                      <Check size={12} />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => decidePendingAction('reject')}
+                      disabled={agentChat.isPending}
+                      className="inline-flex items-center gap-1.5 border border-status-fault/40 bg-status-fault/15 px-3 py-1.5 text-[12px] text-status-fault disabled:opacity-50"
+                    >
+                      <X size={12} />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="faults" className="mt-4 px-6">
+            <FaultsTabContent devices={devices} selectedNodeId={historyNodeId} />
+          </TabsContent>
+
+          <TabsContent value="telemetry" className="mt-4 px-6">
+            <TelemetryTabContent
+              devices={devices}
+              historyByNodeId={historyByNodeId}
+              selectedNodeId={historyNodeId}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {activeTab === 'chat' && (
+        <div className="shrink-0 bg-background pb-4 pt-2 px-6">
+          <div className="container max-w-3xl">
+            <input
+              ref={documentInputRef}
+              type="file"
+              accept=".pdf,.txt,.md"
+              onChange={handleDocumentSelect}
+              className="hidden"
+            />
+
+            {(documentsQuery.error instanceof Error
+              || uploadDocumentMutation.error instanceof Error
+              || documents.length > 0
+              || Boolean(pendingUploadName)
+              || documentsQuery.isLoading) && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {documentsQuery.isLoading && documents.length === 0 && (
+                  <div className="text-[11px] text-muted-foreground">Loading documents...</div>
+                )}
+
+                {pendingUploadName && (
+                  <div className="inline-flex max-w-full items-center gap-1.5 border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
+                    <Loader2 size={11} className="animate-spin" />
+                    <span className="truncate">Uploading {pendingUploadName}</span>
+                  </div>
+                )}
+
+                {documents.map((document) => (
+                  <div
+                    key={document.id}
+                    className="inline-flex max-w-full items-center gap-2 border border-border bg-card px-2.5 py-1 text-[11px]"
+                  >
+                    {document.status === 'processing' ? (
+                      <Loader2 size={11} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <FileText size={11} className="text-muted-foreground" />
+                    )}
+                    <span className="max-w-[180px] truncate text-foreground">{document.filename}</span>
+                    {document.status === 'processing' && (
+                      <span className="uppercase tracking-wider text-muted-foreground">
+                        processing
+                      </span>
+                    )}
+                    {document.status === 'error' && (
+                      <span className="text-status-fault">
+                        {document.errorMessage ?? 'processing failed'}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => deleteDocumentMutation.mutate(document.id)}
+                      disabled={deleteDocumentMutation.isPending}
+                      className="text-status-fault disabled:opacity-50"
+                      aria-label={`Delete ${document.filename}`}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+
+                {uploadDocumentMutation.error instanceof Error && (
+                  <div className="text-[11px] text-status-fault">
+                    Upload failed ({uploadDocumentMutation.error.message})
+                  </div>
+                )}
+
+                {documentsQuery.error instanceof Error && (
+                  <div className="text-[11px] text-status-fault">
+                    Could not load documents ({documentsQuery.error.message})
+                  </div>
+                )}
               </div>
             )}
+
+            <div className="border border-border bg-card px-4 py-3">
+              <form
+                className="flex items-center gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  sendPrompt(input);
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => documentInputRef.current?.click()}
+                  disabled={uploadDocumentMutation.isPending}
+                  className="inline-flex h-8 items-center justify-center border border-border px-3 text-[12px] hover:border-foreground transition-colors disabled:opacity-50"
+                  aria-label="Upload building document"
+                  title="Upload building document"
+                >
+                  <Plus size={12} />
+                </button>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    setCaretPosition(event.target.selectionStart ?? event.target.value.length);
+                  }}
+                  onClick={(event) => {
+                    setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+                  }}
+                  onKeyUp={(event) => {
+                    setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!mentionSuggestions.length) return;
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setMentionCursor((current) => (current + 1) % mentionSuggestions.length);
+                      return;
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setMentionCursor((current) =>
+                        current === 0 ? mentionSuggestions.length - 1 : current - 1,
+                      );
+                      return;
+                    }
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const selected = mentionSuggestions[mentionCursor] ?? mentionSuggestions[0];
+                      if (selected) {
+                        applyMention(selected.id);
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-transparent text-[13px] outline-none"
+                  placeholder="Ask why a fault happened, request history, or ask to run an action"
+                />
+                <button
+                  type="submit"
+                  disabled={agentChat.isPending || !input.trim()}
+                  className="inline-flex h-8 items-center gap-1.5 border border-border px-3 text-[12px] hover:border-foreground transition-colors disabled:opacity-50"
+                >
+                  <Send size={12} />
+                  Send
+                </button>
+              </form>
+
+              {mentionSuggestions.length > 0 && (
+                <div className="mt-2 border border-border bg-background p-2">
+                  <div className="label-caps mb-1">Node mentions</div>
+                  <div className="space-y-1">
+                    {mentionSuggestions.map((node, index) => (
+                      <button
+                        key={node.id}
+                        type="button"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          applyMention(node.id);
+                        }}
+                        className={`w-full text-left px-2 py-1 text-[12px] transition-colors ${
+                          mentionCursor === index ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        <span className="font-medium text-foreground">@{node.id}</span>
+                        <span className="mx-2">-</span>
+                        <span>{node.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>}
+      )}
     </div>
   );
 }
