@@ -3,6 +3,7 @@ import { Activity, Bot, Check, Clock3, Loader2, Send, ShieldAlert, Wrench, X } f
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { type AgentChatMessage, type AgentToolEvent, type AgentPendingAction, type Device } from '@/data/mockDevices';
+import PageHeader from '@/components/PageHeader';
 import { useAgentChat } from '@/hooks/useAgentChat';
 import { useNodeFaultHistory } from '@/hooks/useNodeFaultHistory';
 
@@ -408,13 +409,12 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
   };
 
   return (
-    <div className="flex-1 px-6 pt-5 pb-6 overflow-hidden flex flex-col">
-      <div className="mb-4">
-        <h1 className="font-display text-lg tracking-tight">Operations Agent</h1>
-        <p className="text-[13px] text-muted-foreground mt-0.5">
-          Ask for diagnosis, fault history, and approved state-changing actions.
-        </p>
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <PageHeader
+        title="Operations Agent"
+        subtitle="Diagnosis, fault history, and approved actions."
+      />
+      <div className="flex-1 p-6 overflow-hidden flex flex-col">
 
       <div className="mb-4 flex flex-wrap gap-2">
         {quickPrompts.map((prompt) => (
@@ -680,6 +680,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

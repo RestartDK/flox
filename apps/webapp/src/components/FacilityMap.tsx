@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
+import PageHeader from '@/components/PageHeader';
 import { type AHUUnit, type Device, type AirflowDirection } from '@/data/mockDevices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -386,14 +387,13 @@ export default function FacilityMap({ ahuUnits, devices, nodePositions, onDevice
   const resetView = () => setTransform({ x: 0, y: 0, scale: 1 });
 
   return (
-    <div className="flex-1 px-6 pt-5 pb-6 flex flex-col overflow-hidden">
-      <div className="mb-4 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="font-display text-lg tracking-tight">Facility Overview</h1>
-          <p className="text-[13px] text-muted-foreground mt-0.5">2-Bedroom Apartment · 78 m² · {devices.length} devices connected</p>
-        </div>
-        <ModeToggle />
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <PageHeader
+        title="Facility Overview"
+        subtitle={`78 m² · ${devices.length} devices`}
+        actions={<ModeToggle />}
+      />
+      <div className="flex-1 p-6 flex flex-col overflow-hidden">
 
       <motion.div
         initial={{ opacity: 0, y: 4 }}
@@ -491,6 +491,7 @@ export default function FacilityMap({ ahuUnits, devices, nodePositions, onDevice
           ))}
         </svg>
       </motion.div>
+      </div>
     </div>
   );
 }

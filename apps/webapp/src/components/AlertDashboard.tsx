@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { type Device, type Fault } from '@/data/mockDevices';
 import { useResolveFault } from '@/hooks/useFacilityData';
 import { Zap, Check, Loader2 } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
 
 interface AlertDashboardProps {
   devices: Device[];
@@ -39,11 +40,12 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
   const totalEnergyWaste = `${alerts.reduce((sum, alert) => sum + parseEnergyWaste(alert.fault.energyWaste), 0).toLocaleString()} kWh/day`;
 
   return (
-    <div className="flex-1 px-6 pt-5 pb-6 overflow-y-auto">
-      <div className="mb-6">
-        <h1 className="font-display text-lg tracking-tight">Alert Dashboard</h1>
-        <p className="text-[13px] text-muted-foreground mt-0.5">{alerts.length} active faults across {new Set(alerts.map(a => a.device.id)).size} devices</p>
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <PageHeader
+        title="Alert Dashboard"
+        subtitle={`${alerts.length} active faults across ${new Set(alerts.map(a => a.device.id)).size} devices`}
+      />
+      <div className="flex-1 p-6 overflow-y-auto">
 
       {/* Summary bar */}
       <div className="grid grid-cols-4 gap-3 mb-6">
@@ -116,6 +118,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice }: AlertDas
             No faults match the current filter.
           </div>
         )}
+      </div>
       </div>
     </div>
   );
