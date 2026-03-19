@@ -144,3 +144,23 @@ python -m pytest tests/test_inference.py::test_health -v
 Interactive API documentation is automatically available at:
 - Swagger UI: `http://localhost:8200/docs`
 - ReDoc: `http://localhost:8200/redoc`
+
+## Datacenter HVAC Simulation
+
+A minimal state-kernel simulation now lives in `ml/simulation/`.
+
+- 1D finite-difference airflow propagation along intake/supply/exhaust ducts
+- 2D finite-difference thermal propagation in three datacenter zones (rows A/B, C/D, E/F)
+- Control kernel to adjust valve/damper commands toward zone setpoints
+- Cascade kernel to model rack CPU throttling/shutdown from thermal stress
+
+Run the baseline vs failure comparison with a minimal matplotlib output:
+
+```bash
+python -m ml.simulation --scenario dmp_ef_stuck --duration 900
+```
+
+Artifacts are written to `ml/simulation/artifacts/` by default:
+- `comparison_<scenario>.png`
+- `heatmap_<scenario>.png`
+- `discovery_<scenario>.json`
