@@ -22,7 +22,7 @@
 ![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
 ![Nx](https://img.shields.io/badge/Nx-143055?style=flat-square&logo=nx&logoColor=white)
 
-> **Real-time fault intelligence for HVAC actuators.** Flox ingests live telemetry from Belimo actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
+> **Real-time fault intelligence for [HVAC](https://www.britannica.com/technology/HVAC) actuators.** Flox ingests live telemetry from [Belimo](https://www.belimo.com/) actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
 
 
 
@@ -288,26 +288,3 @@ erDiagram
 ```
 
 
-## Python logging
-
-```python
-from shacklib import get_logger
-
-logger = get_logger("classifier")
-logger.info("diagnosis cycle complete", extra={"processed": 8, "open_faults": 2})
-```
-
-Logs are written as structured JSON to console and `./logs/`. Set `LOKI_PORT` and run `make lift.logging` to push logs to Loki. Grafana is available at `http://localhost:$GRAFANA_PORT` — add a Loki data source at `http://loki:3100`.
-
-
-## Frontend auth
-
-Disabled by default. To enable Supabase session auth:
-
-```env
-VITE_REQUIRE_AUTH=true
-VITE_SUPABASE_URL=https://<project>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon-key>
-```
-
-All routes are gated automatically when auth is enabled.
