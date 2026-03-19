@@ -75,7 +75,7 @@ describe('Index page', () => {
 
     render(<Index />, { wrapper });
 
-    expect(await screen.findByRole('heading', { name: 'Facility Overview' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Datacenter Overview' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Alerts' }));
     expect(await screen.findByRole('heading', { name: 'Alert Dashboard' })).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('Index page', () => {
     fireEvent.click(screen.getByText('Stiction Suspected'));
 
     await waitFor(() => {
-      expect(screen.getByText('Living Room Chiller Valve')).toBeInTheDocument();
+      expect(screen.getByText('Valve Row A')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Live Telemetry (24h)')).toBeInTheDocument();
