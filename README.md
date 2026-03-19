@@ -1,235 +1,243 @@
-# Ultiplate
+<img align="right" width="300" src="https://github.com/user-attachments/assets/df49b0d7-e33d-4dcf-a253-b7208e6bb8d8">
 
-Template for any project: SaaS webapp, API server, ML pipeline, scraper, CLI, or background worker. AI-native, platform-agnostic, managed via Makefile + Nx.
+# Flox
 
-## Quick Start
+
+![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=white&labelColor=20232A)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Radix UI](https://img.shields.io/badge/shadcn%2Fui-000000?style=flat-square&logo=radixui&logoColor=white)
+![Bun](https://img.shields.io/badge/Bun-1.2-FBF0DF?style=flat-square&logo=bun&logoColor=black)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![Celery](https://img.shields.io/badge/Celery-37814A?style=flat-square&logo=celery&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![uv](https://img.shields.io/badge/uv-DE5FE9?style=flat-square)
+![Anthropic](https://img.shields.io/badge/Claude-Operations_Agent-191919?style=flat-square&logo=anthropic&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?style=flat-square&logo=scikitlearn&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-189AB4?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Nx](https://img.shields.io/badge/Nx-143055?style=flat-square&logo=nx&logoColor=white)
+
+> **Real-time fault intelligence for [HVAC](https://www.britannica.com/technology/HVAC) actuators.** Flox ingests live telemetry from [Belimo](https://www.belimo.com/) actuators — torque, motor position, temperature, signal quality — runs continuous fault classification, and surfaces actionable insights through a facility dashboard and a conversational AI operations agent.
+
+
+
+
+## What it does
+
+Belimo actuators collect rich internal signals during operation — torque demand, motor position feedback, internal temperature, and control signal quality — but this data is rarely used beyond basic device status.
+
+Flox closes that gap:
+
+1. **Telemetry ingest** — actuator signals are ingested in real time and persisted with full history per variable per device.
+2. **Fault classification** — a Celery worker runs a continuous diagnosis cycle. Heuristic rules detect known failure modes (stiction, high-torque anomaly, temperature drift, signal loss). An optional ML inference server extends this with trained classifiers.
+3. **Fault propagation** — device-level faults roll up through the node hierarchy (actuator → AHU → plant), so system-level health reflects the worst downstream condition.
+4. **Facility dashboard** — a live map view shows zone health, device positions, and active faults across the building. An issues panel lists all open faults ranked by severity, with energy waste and estimated cost impact per fault.
+5. **Operations agent** — a Claude-powered agent answers natural-language questions about faults, runs diagnosis on demand, retrieves fault history, and can execute corrective actions with explicit operator approval before any write is committed.
+
+
+## Fault types detected
+
+| Kind | Severity |
+|---|---|
+| `stiction_suspected` | Critical |
+| `high_torque_anomaly` | Warning |
+| `temperature_drift` | Warning |
+| `signal_loss` | Critical |
+| `weak_signal` | Warning |
+
+ML-based classifiers (when enabled) extend coverage beyond rule thresholds.
+
+
+## Quick start
 
 ```bash
-cp .env.example .env        # fill in NAME and any keys you need
-make init                   # uv venv + sync + env linking
-make dev                    # Vite webapp at http://localhost:3000
-make nx.projects            # list Nx projects in the monorepo
+cp .env.example .env      # set NAME, ANTHROPIC_API_KEY, and database credentials
+make init                 # create venv, sync Python deps, link env files
+make up                   # start postgres, redis, fastapi backend, classifier worker
+make dev                  # start Vite frontend at http://localhost:3000
 ```
 
-For Docker services (postgres, redis, fastapi backend, classifier worker, ml inference, worker):
+The frontend connects to the FastAPI backend at `/api/status`. If the backend is not running the dashboard will show a connection error.
+
 ```bash
-make up
+make doctor               # verify toolchain
+make help                 # list all targets
 ```
 
-## Directory
 
-```
-apps/
-  webapp/          Vite + React 18 + Tailwind + Supabase auth (Bun)
-  webapp-minimal/  Streamlit quick prototype
-  backend/
-    fastapi/       FastAPI server (set BACKEND_MODE=fastapi)
-    flask/         Flask server  (set BACKEND_MODE=flask)
-  worker/          Celery background worker backed by Redis
-ml/
-  configs/         YAML config for data + training hyperparameters
-  models/          arch.py (architecture) + train.py (training loop)
-  data/            etl.py + processed artifacts
-  inference.py     FastAPI inference server
-  notebooks/       Jupyter notebooks
-shacklib/          Shared Python utilities (logger, scraper, agent)
-src/               Simple scripts / CLI entry points
+## Data pipeline
+
+```mermaid
+flowchart TD
+    A([Actuator]) -->|telemetry stream| B[POST /api/ingest\nFastAPI]
+    B --> C[(PostgreSQL\ntelemetry history\n+ latest values)]
+    C --> D[Celery beat worker\nrun_diagnosis_cycle]
+    D -->|heuristic + ML classifier| E{Fault?}
+    E -->|yes| F[Attach / update fault\nset node status]
+    E -->|no| G[Clear fault\nmark healthy]
+    F --> H[Propagate status\nup node hierarchy]
+    G --> H
+    H --> C
+    C --> I[GET /api/status\nFastAPI]
+    I --> J[React dashboard\nmap · issues · telemetry charts]
 ```
 
-## Make Targets
+
+## Repository layout
+
+```mermaid
+mindmap
+  root((Flox))
+    apps
+      webapp
+        Facility map
+        Issues dashboard
+        Device telemetry charts
+        AI agent panel
+      backend
+        fastapi
+          Telemetry ingest
+          Status endpoint
+          Fault resolution
+          Agent chat
+          Document upload
+      worker
+        Celery beat
+        Classification loop
+    ml
+      models
+        Architecture
+        Training loop
+      data
+        ETL pipeline
+        Processed artifacts
+      inference.py
+        ML inference server
+      configs
+        Hyperparameter YAML
+    shacklib
+      diagnosis_engine.py
+        Fault classification
+        State management
+        Payload builders
+      agent.py
+        Claude integration
+      backend_state.py
+        Postgres read/write
+      node_simulator.py
+        Actuator signal simulator
+      mock_facility.py
+        Seed data
+      logger.py
+        Structured JSON logging
+    database
+      SQL init files
+    docker
+      Per-service Dockerfiles
+    scripts
+      Seed and migration helpers
+```
+
+
+## Operations agent
+
+The agent is powered by Claude and has access to platform tools: querying live device status, fetching fault history for a specific node, running the diagnosis cycle, and resolving faults.
+
+Destructive actions require explicit operator approval before execution. The frontend surfaces an approval prompt; the agent does not proceed until the operator confirms.
+
+```python
+# The agent is exposed at POST /api/agent/chat
+# The frontend sends the full conversation history on each turn.
+# Tool events are returned alongside the reply so the UI can display what ran.
+```
+
+To interact via the UI, open the **Operations Agent** panel and type a question. Use `@NODE_ID` to attach a specific device to your message. Quick prompts are generated automatically from the current top fault.
+
+Example prompts:
+
+- `Give me a live system overview and top active faults.`
+- `Why is node BEL-VLV-003 reporting stiction_suspected?`
+- `Show fault history for node BEL-AHU-001.`
+- `Run diagnosis for BEL-VLV-003 now.`
+- `Resolve fault fault-a3b2c1d0 with note "validated on site".`
+
+
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in the values relevant to your deployment.
+
+| Variable | Description |
+|---|---|
+| `NAME` | Project name, used as Docker container prefix |
+| `ANTHROPIC_API_KEY` | Required for the operations agent |
+| `BACKEND_PORT` | FastAPI listen port (default: 5000) |
+| `POSTGRES_*` | Database connection settings |
+| `REDIS_PORT` | Redis port |
+| `ML_URL` | URL of the ML inference service |
+| `CLASSIFIER_INTERVAL_SECONDS` | How often the classifier runs (default: 5) |
+| `BACKEND_STARTUP_SEED_MODE` | Seed mode on startup: `always` or `once` |
+| `VITE_REQUIRE_AUTH` | Enable Supabase session auth on the frontend |
+| `LOKI_PORT` / `GRAFANA_PORT` | Enable remote log aggregation |
+
+
+## Make targets
 
 | Target | Description |
-|--------|-------------|
-| `make init` | First-time setup |
-| `make dev` | Start Vite webapp |
-| `make up` | Start Docker core services |
-| `make run.backend` | Start API backend |
-| `make run.worker` | Start Celery worker |
-| `make nx.graph` | Open Nx project graph |
-| `make nx.affected` | Run lint/test/build for affected projects |
-| `make lift.minio` | Start MinIO object storage |
-| `make lift.logging` | Start Loki + Grafana |
-| `make lift.mlflow` | Start optional MLflow server |
-| `make lift.database` | Start Postgres / MongoDB |
-| `make doctor` | Verify toolchain |
+|---|---|
+| `make init` | First-time setup: venv, deps, env linking |
+| `make dev` | Start Vite frontend |
+| `make up` | Start core services (postgres, redis, backend, classifier, worker) |
+| `make down` | Stop all services |
+| `make run.backend` | Start FastAPI backend only |
+| `make run.worker` | Start Celery worker only |
+| `make run.ml` | Start ML inference server |
+| `make lift.ml` | Core services + ML inference |
+| `make lift.sim` | Core services + node simulator |
+| `make lift.logging` | Add Loki + Grafana log stack |
+| `make lift.mlflow` | Add MLflow experiment tracking |
+| `make etl` | Run ETL pipeline |
+| `make train` | Run model training |
+| `make fmt` | Format Python with black |
+| `make lint` | Lint with ruff |
+| `make type` | Type-check with mypy |
+| `make test` | Run pytest |
+| `make clean` | Remove caches and build artifacts |
+| `make doctor` | Verify toolchain (Python, uv, Bun, Docker) |
 
-Run `make help` for the full list.
 
-## Nx Workspace
-
-This template now ships with Nx project definitions for:
-
-- `webapp` (`apps/webapp`)
-- `webapp-minimal` (`apps/webapp-minimal`)
-- `backend-fastapi` (`apps/backend/fastapi`)
-- `backend-flask` (`apps/backend/flask`)
-- `worker` (`apps/worker`)
-- `ml` (`ml`)
-- `shacklib` (`shacklib`)
-
-Common commands:
-
-```bash
-bun x nx show projects
-bun x nx graph
-bun x nx run webapp:dev
-bun x nx affected -t lint,test,build
-```
-
-## Railway Deploy
-
-The frontend in `apps/webapp` is a Vite React app. If you deploy from the repo root on Railway, use `railway.json` so Railpack builds and starts the correct app:
-
-- build: `bun install --cwd apps/webapp && bun run --cwd apps/webapp build`
-- start: `bun run --cwd apps/webapp start`
-
-If you instead set the Railway service Root Directory to `apps/webapp`, the equivalent commands are:
-
-```bash
-bun install
-bun run build
-bun run start
-```
-
-Frontend environment variables must use the `VITE_` prefix.
-
-## AI Agent Capacity
-
-Set `ANTHROPIC_API_KEY` in `.env`. Then use:
-
-```python
-from shacklib import ask, stream, Agent
-
-# One-shot
-print(ask("Summarize this data: ..."))
-
-# Streaming
-for chunk in stream("Write a Celery task that ..."):
-    print(chunk, end="", flush=True)
-
-# Multi-turn
-agent = Agent(system="You are a senior Python developer.")
-agent.chat("Scaffold a FastAPI endpoint for user profiles")
-agent.chat("Add input validation and error handling")
-```
-
-Claude Code slash commands (type `/` in a Claude Code session):
-- `/plan` - implementation plan for an idea within this boilerplate
-- `/build` - implement a feature end-to-end
-- `/api` - scaffold a new backend endpoint
-- `/page` - scaffold a new webapp page
-- `/review` - code review of recent changes
-- `/ship` - stage and commit changes
-
-## Logging
-
-```python
-from shacklib import get_logger
-logger = get_logger("service")
-```
-
-Outputs structured JSON to console + `./logs/`. Optional Loki push when `LOKI_PORT` is set and `make lift.logging` is running. View in Grafana at `http://localhost:$GRAFANA_PORT` (add Loki data source: `http://loki:3100`).
-
-## Python Packaging
-
-Python dependencies are managed with `pyproject.toml` and `uv`.
-
-```bash
-make deps         # uv sync
-make lock         # refresh uv.lock
-uv run pytest -v
-```
-
-## ML Workflow
-
-High-level ML hyperparameters live in YAML configs:
-
-- `ml/configs/data/default.yaml`
-- `ml/configs/train/default.yaml`
-
-Run with Nx targets (cacheable with explicit inputs/outputs):
-
-```bash
-bun x nx run ml:etl
-bun x nx run ml:train
-```
-
-`ml:train` depends on `ml:etl`, and both targets cache artifacts in `ml/data/processed`, `ml/models/weights`, and `ml/tensorboard`.
-
-## Services (docker compose profiles)
+## Optional services
 
 | Profile | Services | Command |
-|---------|----------|---------|
-| _(default)_ | postgres, redis, backend-fastapi, backend-classifier, ml-inference, worker | `make up` |
+|---|---|---|
+| _(default)_ | postgres, redis, backend, classifier, worker | `make up` |
+| `ml` | + ML inference | `make lift.ml` |
+| `sim` | + node simulator | `make lift.sim` |
 | `minio` | + MinIO object storage | `make lift.minio` |
 | `tensorboard` | + TensorBoard | `make lift.tensorboard` |
-| `mlflow` | + MLflow tracking server (optional) | `make lift.mlflow` |
+| `mlflow` | + MLflow | `make lift.mlflow` |
 | `logging` | + Loki + Grafana | `make lift.logging` |
-| `database` | + Postgres + MongoDB | `make lift.database` |
+| `database` | + MongoDB | `make lift.database` |
 
-## Webapp Auth
 
-Auth is off by default (`VITE_REQUIRE_AUTH=false`). Set it to `true` and configure the Vite-prefixed Supabase env vars to enable session-based auth gating across all routes.
+## Database schema
 
-## Backend State Schema (Postgres)
-
-The backend state storage is now normalized into relational tables while preserving full backward compatibility through a legacy snapshot row in `backend_state` (`id = 1`).
+Application state is stored in normalized Postgres tables. A legacy JSONB snapshot in `backend_state` (`id = 1`) is maintained for backward compatibility. `read_state()` reconstructs the full JSON contract; `update_state()` writes both representations atomically.
 
 ```mermaid
 erDiagram
-    backend_state {
-        SMALLINT id PK
-        JSONB state
-        TIMESTAMPTZ updated_at
-    }
-
-    backend_storage_meta {
-        SMALLINT id PK
-        BOOLEAN bootstrapped
-        TIMESTAMPTZ updated_at
-    }
-
-    backend_state_top_level {
-        SMALLINT id PK
-        JSONB payload
-    }
-
-    backend_state_meta {
-        SMALLINT id PK
-        TEXT last_ingest_at
-        TEXT last_classification_at
-        TEXT last_fault_resolution_at
-        TEXT seed_source
-        TEXT seeded_at
-        JSONB extras
-    }
-
-    backend_catalog_meta {
-        SMALLINT id PK
-        JSONB extras
-    }
-
-    backend_agent_meta {
-        SMALLINT id PK
-        JSONB extras
-    }
-
     backend_nodes {
         TEXT id PK
         TEXT label
         TEXT type
         TEXT status
         DOUBLE position
-        TEXT updated_at
         TEXT latest_fault_id
-        TEXT latest_telemetry_at
-        JSONB extras
-    }
-
-    backend_node_parents {
-        TEXT node_id FK
-        INTEGER ordinal
-        TEXT parent_id
+        TEXT updated_at
     }
 
     backend_node_latest_telemetry {
@@ -244,7 +252,6 @@ erDiagram
         INTEGER ordinal
         TEXT point_time
         JSONB value
-        JSONB extras
     }
 
     backend_faults {
@@ -256,71 +263,16 @@ erDiagram
         TEXT summary
         TEXT recommended_action
         TEXT opened_at
-        TEXT updated_at
         TEXT resolved_by
         TEXT note
-        JSONB extras
-    }
-
-    backend_catalog_zones {
-        TEXT id PK
-        INTEGER ordinal
-        TEXT name
-        TEXT label
-        INTEGER x
-        INTEGER y
-        INTEGER width
-        INTEGER height
-        INTEGER health_score
-        JSONB extras
-    }
-
-    backend_catalog_ahu_units {
-        TEXT id PK
-        INTEGER ordinal
-        TEXT label
-        INTEGER x
-        INTEGER y
-        TEXT description
-        JSONB extras
     }
 
     backend_catalog_device_templates {
         TEXT id PK
-        INTEGER ordinal
         TEXT name
         TEXT model
-        TEXT serial
         TEXT type
-        TEXT zone
         TEXT zone_id
-        INTEGER x
-        INTEGER y
-        TEXT installed_date
-        DOUBLE base_anomaly_score
-        TEXT airflow_direction
-        JSONB extras
-    }
-
-    backend_catalog_template_history {
-        TEXT template_id FK
-        TEXT metric
-        INTEGER ordinal
-        TEXT point_time
-        JSONB value
-        JSONB extras
-    }
-
-    backend_catalog_fault_meta {
-        TEXT device_id PK
-        TEXT estimated_impact
-        TEXT energy_waste
-        JSONB extras
-    }
-
-    backend_agent_pending_actions {
-        TEXT action_id PK
-        JSONB payload
     }
 
     backend_agent_audit_log {
@@ -328,19 +280,11 @@ erDiagram
         JSONB payload
     }
 
-    backend_nodes ||--o{ backend_node_parents : "parent links"
     backend_nodes ||--o{ backend_node_latest_telemetry : "latest telemetry"
-    backend_nodes ||--o{ backend_node_history : "history points"
-    backend_nodes ||--o{ backend_faults : "fault timeline"
-
-    backend_catalog_device_templates ||--o{ backend_catalog_template_history : "template history"
+    backend_nodes ||--o{ backend_node_history : "history"
+    backend_nodes ||--o{ backend_faults : "faults"
     backend_catalog_device_templates ||--o| backend_catalog_fault_meta : "impact metadata"
-
-    backend_agent_meta ||--o{ backend_agent_pending_actions : "pending actions"
-    backend_agent_meta ||--o{ backend_agent_audit_log : "audit events"
+    backend_agent_meta ||--o{ backend_agent_audit_log : "audit log"
 ```
 
-Compatibility notes:
-- `read_state()` reconstructs the original JSON contract from relational tables.
-- `update_state()` writes both relational tables and the legacy `backend_state.state` JSONB snapshot.
-- Existing API/worker/webapp consumers continue using the same state shape.
+
