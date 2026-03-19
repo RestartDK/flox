@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, Loader2, Send, ShieldAlert, X } from 'lucide-react';
 import { type AgentChatMessage, type AgentToolEvent, type AgentPendingAction, type Device } from '@/data/mockDevices';
 import { useAgentChat } from '@/hooks/useAgentChat';
@@ -11,6 +11,12 @@ interface ConversationMessage {
   id: string;
   role: AgentChatMessage['role'];
   content: string;
+}
+
+interface MentionContext {
+  start: number;
+  end: number;
+  query: string;
 }
 
 const severityWeight: Record<string, number> = {
@@ -28,8 +34,33 @@ const toPayloadMessages = (messages: ConversationMessage[]): AgentChatMessage[] 
 
 const nowId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+const extractMentionContext = (value: string, caretPosition: number): MentionContext | null => {
+  const beforeCaret = value.slice(0, caretPosition);
+  const mentionStart = beforeCaret.lastIndexOf('@');
+  if (mentionStart < 0) {
+    return null;
+  }
+
+  const previousChar = mentionStart > 0 ? beforeCaret[mentionStart - 1] : ' ';
+  if (previousChar.trim()) {
+    return null;
+  }
+
+  const query = beforeCaret.slice(mentionStart + 1);
+  if (/\s/.test(query)) {
+    return null;
+  }
+
+  return {
+    start: mentionStart,
+    end: caretPosition,
+    query,
+  };
+};
+
 export default function AgentPanel({ devices }: AgentPanelProps) {
   const agentChat = useAgentChat();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [messages, setMessages] = useState<ConversationMessage[]>([
     {
@@ -40,6 +71,8 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
     },
   ]);
   const [input, setInput] = useState('');
+  const [caretPosition, setCaretPosition] = useState(0);
+  const [mentionCursor, setMentionCursor] = useState(0);
   const [pendingAction, setPendingAction] = useState<AgentPendingAction | null>(null);
   const [latestToolEvents, setLatestToolEvents] = useState<AgentToolEvent[]>([]);
 
@@ -61,11 +94,82 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
     if (topFault) {
       prompts.push(`Why is node ${topFault.device.id} reporting ${topFault.fault.type}?`);
       prompts.push(`Show fault history for node ${topFault.device.id}.`);
+      prompts.push(`Run node diagnosis for ${topFault.device.id} now.`);
       prompts.push(`Resolve fault ${topFault.fault.id} with note "validated during demo".`);
     }
 
     return prompts;
   }, [topFault]);
+
+  const mentionContext = useMemo(
+    () => extractMentionContext(input, caretPosition),
+    [input, caretPosition],
+  );
+
+  const nodeSuggestions = useMemo(() => {
+    const unique = new Map<string, { id: string; name: string; status: Device['status'] }>();
+    for (const device of devices) {
+      unique.set(device.id, {
+        id: device.id,
+        name: device.name,
+        status: device.status,
+      });
+    }
+    return Array.from(unique.values()).sort((a, b) => a.id.localeCompare(b.id));
+  }, [devices]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (!mentionContext) {
+      return [];
+    }
+
+    const query = mentionContext.query.trim().toUpperCase();
+    const scored = nodeSuggestions
+      .filter((node) => {
+        if (!query) {
+          return true;
+        }
+        const id = node.id.toUpperCase();
+        const name = node.name.toUpperCase();
+        return id.includes(query) || name.includes(query);
+      })
+      .sort((a, b) => {
+        const aStarts = a.id.toUpperCase().startsWith(query);
+        const bStarts = b.id.toUpperCase().startsWith(query);
+        if (aStarts !== bStarts) {
+          return aStarts ? -1 : 1;
+        }
+        return a.id.localeCompare(b.id);
+      });
+
+    return scored.slice(0, 6);
+  }, [mentionContext, nodeSuggestions]);
+
+  useEffect(() => {
+    setMentionCursor(0);
+  }, [mentionContext?.start, mentionContext?.query]);
+
+  const applyMention = (nodeId: string) => {
+    if (!mentionContext) {
+      return;
+    }
+
+    const trailing = input.slice(mentionContext.end);
+    const needsTrailingSpace = trailing.length === 0 || !trailing.startsWith(' ');
+    const inserted = `${input.slice(0, mentionContext.start + 1)}${nodeId}${needsTrailingSpace ? ' ' : ''}${trailing}`;
+    const nextCaret = mentionContext.start + 1 + nodeId.length + (needsTrailingSpace ? 1 : 0);
+
+    setInput(inserted);
+    setCaretPosition(nextCaret);
+
+    requestAnimationFrame(() => {
+      if (!inputRef.current) {
+        return;
+      }
+      inputRef.current.focus();
+      inputRef.current.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
 
   const sendPrompt = (text: string) => {
     const prompt = text.trim();
@@ -82,6 +186,7 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
     const nextMessages = [...messages, userMessage];
     setMessages(nextMessages);
     setInput('');
+    setCaretPosition(0);
     setPendingAction(null);
 
     agentChat.mutate(
@@ -258,8 +363,45 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
         }}
       >
         <input
+          ref={inputRef}
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => {
+            setInput(event.target.value);
+            setCaretPosition(event.target.selectionStart ?? event.target.value.length);
+          }}
+          onClick={(event) => {
+            setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+          }}
+          onKeyUp={(event) => {
+            setCaretPosition(event.currentTarget.selectionStart ?? event.currentTarget.value.length);
+          }}
+          onKeyDown={(event) => {
+            if (!mentionSuggestions.length) {
+              return;
+            }
+
+            if (event.key === 'ArrowDown') {
+              event.preventDefault();
+              setMentionCursor((current) => (current + 1) % mentionSuggestions.length);
+              return;
+            }
+
+            if (event.key === 'ArrowUp') {
+              event.preventDefault();
+              setMentionCursor((current) =>
+                current === 0 ? mentionSuggestions.length - 1 : current - 1,
+              );
+              return;
+            }
+
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              const selected = mentionSuggestions[mentionCursor] ?? mentionSuggestions[0];
+              if (selected) {
+                applyMention(selected.id);
+              }
+            }
+          }}
           className="flex-1 bg-transparent text-[13px] outline-none"
           placeholder="Ask why a fault happened, request history, or ask to run an action"
         />
@@ -272,6 +414,31 @@ export default function AgentPanel({ devices }: AgentPanelProps) {
           Send
         </button>
       </form>
+
+      {mentionSuggestions.length > 0 && (
+        <div className="mt-2 border border-border bg-card p-2">
+          <div className="label-caps mb-1">Node mentions</div>
+          <div className="space-y-1">
+            {mentionSuggestions.map((node, index) => (
+              <button
+                key={node.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  applyMention(node.id);
+                }}
+                className={`w-full text-left px-2 py-1 text-[12px] transition-colors ${
+                  mentionCursor === index ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className="font-medium text-foreground">@{node.id}</span>
+                <span className="mx-2">-</span>
+                <span>{node.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

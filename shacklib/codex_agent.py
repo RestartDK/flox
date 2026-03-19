@@ -7,13 +7,13 @@ from uuid import uuid4
 
 import requests
 
-from shacklib.backend_state import update_state
+from shacklib.backend_state import read_state, update_state
 from shacklib.diagnosis_engine import (
     build_status_payload,
     resolve_fault,
-    run_diagnosis_cycle,
     utc_now_iso,
 )
+from shacklib.ml_inference_client import MLInferenceError, infer_failure_mode_for_node
 
 OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
 DEFAULT_AGENT_MODEL = "gpt-5.4"
@@ -23,7 +23,7 @@ _PENDING_ACTIONS_KEY = "pendingActions"
 _AUDIT_LOG_KEY = "auditLog"
 _AUDIT_LOG_LIMIT = 250
 
-_MUTATING_TOOLS = {"resolve_fault", "run_diagnosis_cycle_now"}
+_MUTATING_TOOLS = {"resolve_fault"}
 
 
 def _safe_int(value: Any, default: int, minimum: int, maximum: int) -> int:
@@ -136,12 +136,17 @@ def _tool_definitions() -> list[dict[str, Any]]:
         },
         {
             "type": "function",
-            "name": "run_diagnosis_cycle_now",
-            "description": "Trigger diagnosis worker logic immediately. This mutates platform state and requires user approval.",
+            "name": "run_node_diagnosis",
+            "description": "Run an immediate ML diagnosis for a specific node id.",
             "parameters": {
                 "type": "object",
-                "properties": {},
-                "required": [],
+                "properties": {
+                    "nodeId": {
+                        "type": "string",
+                        "description": "Exact node/device id, for example BEL-VLV-003",
+                    }
+                },
+                "required": ["nodeId"],
                 "additionalProperties": False,
             },
         },
@@ -299,8 +304,6 @@ def _pending_action_summary(name: str, arguments: dict[str, Any]) -> str:
     if name == "resolve_fault":
         fault_id = str(arguments.get("faultId") or "unknown")
         return f"Resolve fault `{fault_id}`"
-    if name == "run_diagnosis_cycle_now":
-        return "Run diagnosis cycle now"
     return f"Execute `{name}`"
 
 
@@ -457,20 +460,36 @@ def _tool_resolve_fault(arguments: dict[str, Any], actor: str) -> dict[str, Any]
     return update_state(_mutator)
 
 
-def _tool_run_diagnosis_cycle_now() -> dict[str, Any]:
-    def _mutator(state: dict[str, Any]) -> dict[str, Any]:
-        summary = run_diagnosis_cycle(state)
-        payload = build_status_payload(state)
+def _tool_run_node_diagnosis(node_id: str) -> dict[str, Any]:
+    state = read_state()
+    nodes = state.get("nodes") if isinstance(state.get("nodes"), dict) else {}
+    node = nodes.get(node_id) if isinstance(nodes, dict) else None
+
+    if not isinstance(node, dict):
         return {
-            "ok": True,
-            "summary": summary,
-            "activeFaults": payload.get("derived", {})
-            .get("buildingStats", {})
-            .get("activeFaults"),
-            "generatedAt": payload.get("generatedAt"),
+            "available": False,
+            "nodeId": node_id,
+            "error": "node not found",
         }
 
-    return update_state(_mutator)
+    try:
+        inference = infer_failure_mode_for_node({"id": node_id, **node})
+    except MLInferenceError as exc:
+        return {
+            "available": False,
+            "nodeId": node_id,
+            "error": str(exc),
+        }
+
+    return {
+        "available": True,
+        "nodeId": node_id,
+        "modelType": inference.get("modelType"),
+        "task": inference.get("task"),
+        "className": inference.get("className"),
+        "confidence": inference.get("confidence"),
+        "diagnosis": inference.get("diagnosis"),
+    }
 
 
 def _execute_tool(name: str, arguments: dict[str, Any], actor: str) -> dict[str, Any]:
@@ -493,8 +512,11 @@ def _execute_tool(name: str, arguments: dict[str, Any], actor: str) -> dict[str,
     if name == "resolve_fault":
         return _tool_resolve_fault(arguments, actor=actor)
 
-    if name == "run_diagnosis_cycle_now":
-        return _tool_run_diagnosis_cycle_now()
+    if name == "run_node_diagnosis":
+        node_id = str(arguments.get("nodeId") or "").strip()
+        if not node_id:
+            return {"error": "nodeId is required"}
+        return _tool_run_node_diagnosis(node_id)
 
     return {"error": f"unknown tool: {name}"}
 
@@ -561,11 +583,6 @@ def _pending_action_reply(name: str, arguments: dict[str, Any], action_id: str) 
         return (
             f"I can resolve fault `{fault_id}` now. Approve this action to apply the change. "
             f"Pending action id: {action_id}."
-        )
-    if name == "run_diagnosis_cycle_now":
-        return (
-            "I can trigger the diagnosis cycle immediately. "
-            f"Approve this action to continue. Pending action id: {action_id}."
         )
     return f"I need approval before executing `{name}`. Pending action id: {action_id}."
 
