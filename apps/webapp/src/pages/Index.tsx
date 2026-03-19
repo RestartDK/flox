@@ -3,10 +3,11 @@ import AppSidebar from '@/components/AppSidebar';
 import FacilityMap from '@/components/FacilityMap';
 import DeviceDetailPanel from '@/components/DeviceDetailPanel';
 import AlertDashboard from '@/components/AlertDashboard';
+import AgentPanel from '@/components/AgentPanel';
 import { useFacilityData } from '@/hooks/useFacilityData';
 
 export default function Index() {
-  const [activeView, setActiveView] = useState<'map' | 'alerts'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'alerts' | 'agent'>('map');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const { ahuUnits, buildingStats, devices, error, isLoading, isError, nodePositions } = useFacilityData();
   const selectedDevice = devices.find(device => device.id === selectedDeviceId) ?? null;
@@ -53,11 +54,15 @@ export default function Index() {
             onDeviceSelect={(device) => setSelectedDeviceId(device.id)}
             selectedDeviceId={selectedDeviceId}
           />
-        ) : (
+        ) : activeView === 'alerts' ? (
           <AlertDashboard devices={devices} onNavigateToDevice={(device) => handleDeviceSelect(device.id)} />
+        ) : (
+          <AgentPanel devices={devices} />
         )}
 
-        <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDeviceId(null)} />
+        {activeView === 'map' && (
+          <DeviceDetailPanel device={selectedDevice} onClose={() => setSelectedDeviceId(null)} />
+        )}
       </div>
 
       {/* Top loading bar placeholder */}
