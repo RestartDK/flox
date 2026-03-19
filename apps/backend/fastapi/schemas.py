@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 NodeStatus = Literal["healthy", "warning", "critical", "offline"]
 DeviceStatus = Literal["healthy", "warning", "fault", "offline"]
@@ -172,3 +172,57 @@ class ResolveFaultResponse(BaseModel):
     ok: bool
     faultId: str
     state: FaultState
+
+
+class AgentChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class AgentToolEvent(BaseModel):
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    outcome: Literal["executed", "pending_approval", "error"]
+    result: dict[str, Any] | None = None
+
+
+class AgentPendingAction(BaseModel):
+    id: str
+    name: str
+    summary: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentChatRequest(BaseModel):
+    messages: list[AgentChatMessage] = Field(default_factory=list)
+    actor: str = Field(default="webapp-operator", min_length=1, max_length=64)
+    pendingActionId: str | None = None
+    pendingActionDecision: Literal["approve", "reject"] | None = None
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> "AgentChatRequest":
+        has_pending_decision = bool(self.pendingActionId) or bool(
+            self.pendingActionDecision
+        )
+        if has_pending_decision:
+            if not self.pendingActionId or not self.pendingActionDecision:
+                raise ValueError(
+                    "pendingActionId and pendingActionDecision must be provided together"
+                )
+            return self
+
+        if not self.messages:
+            raise ValueError(
+                "messages must not be empty when no pending action decision is provided"
+            )
+
+        return self
+
+
+class AgentChatResponse(BaseModel):
+    reply: str
+    model: str
+    generatedAt: str
+    usedFallback: bool = False
+    toolEvents: list[AgentToolEvent] = Field(default_factory=list)
+    pendingAction: AgentPendingAction | None = None

@@ -52,10 +52,10 @@ services:
     ports:
       - "8200:8000"
     environment:
-      - ML_LATEST_WEIGHTS_PATH=/app/models/weights
+      - ML_LATEST_WEIGHTS_PATH=/app/ml/models/weights
       - PYTHONPATH=/app
     volumes:
-      - ./ml/models:/app/models
+      - ./ml/models:/app/ml/models
       - ./.env:/app/.env
     depends_on:
       - redis

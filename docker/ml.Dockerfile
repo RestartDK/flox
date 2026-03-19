@@ -20,10 +20,11 @@ COPY shacklib/ ./shacklib/
 RUN pip install --no-cache-dir --no-deps .
 
 # Copy application source last - most frequently changed
-COPY ml/ ./
+COPY ml/ ./ml/
 COPY src/ ./src/
 
-RUN mkdir -p /app/models/weights
+# Ensure weights directory exists
+RUN mkdir -p /app/ml/models/weights
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health').raise_for_status()" || exit 1
@@ -33,4 +34,6 @@ EXPOSE 8000
 RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app /app
 USER app
+
+WORKDIR /app/ml
 CMD ["uvicorn", "inference:app", "--host", "0.0.0.0", "--port", "8000"]
