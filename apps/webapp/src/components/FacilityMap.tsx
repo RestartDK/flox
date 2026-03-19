@@ -4,7 +4,7 @@ import { useGesture } from '@use-gesture/react';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
 import PageHeader from '@/components/PageHeader';
-import { type AHUUnit, type Device, type AirflowDirection } from '@/data/mockDevices';
+import { type AHUUnit, type Device, type AirflowDirection } from '@/types/facility';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface FacilityMapProps {

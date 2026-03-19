@@ -206,7 +206,7 @@
   }
 
   .dark .card-accent-top {
-    box-shadow: 0 1px 12px -4px hsl(var(--brand) / 0.25);
+    box-shadow: none;
   }
 
   .dark .data-row:hover {
