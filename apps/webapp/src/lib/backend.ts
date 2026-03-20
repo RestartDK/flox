@@ -1,5 +1,5 @@
 import {
-  DEFAULT_DEV_BACKEND_PORT,
+  DEFAULT_PRODUCTION_BACKEND_URL,
   resolveBackendBaseUrl,
 } from './backendConfig';
 
@@ -12,19 +12,12 @@ const getRuntimeEnv = (): Record<string, string | boolean | undefined> => {
 
 export const getBackendBaseUrl = () => {
   const env = getRuntimeEnv();
-  const configured =
-    !env.PROD && typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined;
-  const resolved = resolveBackendBaseUrl({
-    explicitUrl: configured,
-    isProduction: Boolean(env.PROD),
-  });
-  if (resolved) {
-        console.log(`Using backend URL: ${resolved}`);
-        return resolved;
-    }
-    console.warn('No backend URL configured, defaulting to localhost');
-
-  return `http://127.0.0.1:${DEFAULT_DEV_BACKEND_PORT}`;
+  return (
+    resolveBackendBaseUrl({
+      explicitUrl: typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined,
+      isProduction: Boolean(env.PROD),
+    }) ?? DEFAULT_PRODUCTION_BACKEND_URL
+  );
 };
 
 export const buildBackendUrl = (path: string) => {
