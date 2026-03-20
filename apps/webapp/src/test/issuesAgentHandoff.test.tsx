@@ -79,8 +79,6 @@ const device: Device = {
       diagnosis: 'The actuator is drawing current without changing blade position.',
       recommendation: 'Inspect the linkage assembly and re-home the actuator.',
       detectedAt: '2026-03-19T08:14:00Z',
-      estimatedImpact: 'Reduced ventilation in the north wing.',
-      energyWaste: '145 kWh/day',
     },
   ],
 };
@@ -93,8 +91,6 @@ const facilityContext: FacilityContext = {
     warningDevices: 0,
     faultDevices: 1,
     overallHealth: 62,
-    energyWaste: '145 kWh/day',
-    estimatedCost: 'CHF 320/day',
     activeFaults: 1,
   },
   devices: [device],
@@ -178,8 +174,6 @@ describe('issues to agent handoff', () => {
     expect(prompt).toContain(device.faults[0].severity);
     expect(prompt).toContain(device.faults[0].diagnosis);
     expect(prompt).toContain(device.faults[0].recommendation);
-    expect(prompt).toContain(device.faults[0].estimatedImpact);
-    expect(prompt).toContain(device.faults[0].energyWaste);
     expect(prompt).toContain('call the voice escalation tool');
   });
 
