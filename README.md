@@ -288,3 +288,6 @@ erDiagram
 ```
 
 
+## Bayesian network rendering (Python)
+
+![Bayesian network graph](docs/bayesian_network.png)

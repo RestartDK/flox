@@ -1,4 +1,5 @@
 import os
+import json
 import threading
 from uuid import uuid4
 
@@ -6,6 +7,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from schemas import (
     AgentChatRequest,
@@ -55,7 +57,7 @@ from shacklib.ml_inference_client import (
     infer_failure_mode_for_node,
     resolve_ml_url,
 )
-from shacklib.simulation_service import run_simulation_bundle
+from shacklib.simulation_service import run_simulation_bundle, stream_simulation_bundle
 from shacklib.state_seed import seed_state_on_startup
 from shacklib.elevenlabs_agent import (
     ElevenLabsConfigurationError,
@@ -370,15 +372,47 @@ async def elevenlabs_outbound_call(
 
 @app.post("/api/simulation/run", response_model=SimulationRunResponse)
 async def run_simulation(payload: SimulationRunRequest) -> SimulationRunResponse:
-    status_payload = update_state(build_status_payload)
+    status_payload = (
+        update_state(build_status_payload) if not payload.failures else None
+    )
     response = run_simulation_bundle(
         duration_seconds=payload.durationSeconds,
         dt_seconds=payload.dtSeconds,
         failures_payload=[item.model_dump(mode="python") for item in payload.failures],
         status_payload=status_payload,
         generated_at=utc_now_iso(),
+        include_discovery_analysis=payload.includeDiscoveryAnalysis,
     )
     return SimulationRunResponse.model_validate(response)
+
+
+@app.post("/api/simulation/stream")
+async def stream_simulation(payload: SimulationRunRequest) -> StreamingResponse:
+    status_payload = (
+        update_state(build_status_payload) if not payload.failures else None
+    )
+
+    def _iter_stream():
+        for event in stream_simulation_bundle(
+            duration_seconds=payload.durationSeconds,
+            dt_seconds=payload.dtSeconds,
+            failures_payload=[
+                item.model_dump(mode="python") for item in payload.failures
+            ],
+            status_payload=status_payload,
+            generated_at=utc_now_iso(),
+            include_discovery_analysis=payload.includeDiscoveryAnalysis,
+        ):
+            yield json.dumps(event, separators=(",", ":")) + "\n"
+
+    return StreamingResponse(
+        _iter_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/bayesian/current", response_model=BayesianView)

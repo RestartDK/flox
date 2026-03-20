@@ -1,12 +1,12 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
-import { ZoomIn, ZoomOut, Maximize, Play, Pause, LoaderCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Play, LoaderCircle } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
-import { type AHUUnit, type Device, type SimulationFailureInput, type SimulationRunResponse } from '@/types/facility';
+import { type AHUUnit, type Device, type SimulationFailureInput } from '@/types/facility';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { useSimulationRun } from '@/hooks/useSimulationRun';
+import { buildBackendUrl } from '@/lib/backend';
 
 interface DatacenterMapProps {
   ahuUnits: AHUUnit[];
@@ -116,7 +116,6 @@ const averageFlow = (nodePositions: Record<string, number>, ids: string[]) => {
   return ids.reduce((sum, id) => sum + (nodePositions[id] ?? 0), 0) / ids.length;
 };
 
-const SIMULATION_INTERVAL_MS = 80;
 const PLAYBACK_WARMUP_STEPS = 18;
 const SIMULATION_DURATION_SECONDS = 300;
 const DUCT_PARTICLE_DENSITY_MULTIPLIER = 1.8;
@@ -227,17 +226,40 @@ const buildSimulationFailures = (devices: Device[]): SimulationFailureInput[] =>
   return failures;
 };
 
-const timelineAt = (series: number[] | undefined, index: number, fallback: number) => {
-  if (!series || series.length === 0) {
-    return fallback;
-  }
-  const safeIndex = Math.min(Math.max(index, 0), series.length - 1);
-  return series[safeIndex];
-};
-
 const lerp = (from: number, to: number, blend: number) => from + (to - from) * blend;
 const isPulsingStatus = (status: Device['status'] | undefined) =>
   status === 'warning' || status === 'fault' || status === 'offline';
+
+type SimulationStepEvent = {
+  type: 'step';
+  index: number;
+  totalSteps: number;
+  rowTemperatures: Partial<Record<RowId, unknown>>;
+  nodePositions: Record<string, unknown>;
+};
+
+type SimulationInitEvent = {
+  type: 'init';
+  totalSteps: number;
+};
+
+const toNumber = (value: unknown, fallback: number) => {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+};
+
+const toRowTemperatureFrame = (
+  rowTemperatures: Partial<Record<RowId, unknown>>,
+  fallback: Record<RowId, number>,
+): Record<RowId, number> => {
+  return {
+    row_a: toNumber(rowTemperatures.row_a, fallback.row_a),
+    row_b: toNumber(rowTemperatures.row_b, fallback.row_b),
+    row_c: toNumber(rowTemperatures.row_c, fallback.row_c),
+    row_d: toNumber(rowTemperatures.row_d, fallback.row_d),
+    row_e: toNumber(rowTemperatures.row_e, fallback.row_e),
+    row_f: toNumber(rowTemperatures.row_f, fallback.row_f),
+  };
+};
 
 const statusPassthroughFactor: Record<Device['status'], number> = {
   healthy: 1,
@@ -796,131 +818,216 @@ export default function DatacenterMap({
   selectedDeviceId,
 }: DatacenterMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [simulationStep, setSimulationStep] = useState<number | null>(null);
-  const [simulationResult, setSimulationResult] = useState<SimulationRunResponse | null>(null);
-  const [isPlaybackRunning, setIsPlaybackRunning] = useState(false);
+  const [simulationTotalSteps, setSimulationTotalSteps] = useState(0);
+  const [liveNodePositions, setLiveNodePositions] = useState<Record<string, number> | null>(null);
+  const [liveRowTemperatures, setLiveRowTemperatures] = useState<Record<RowId, number> | null>(null);
+  const [baselineRowTemperatures, setBaselineRowTemperatures] = useState<Record<RowId, number>>(defaultBaselineRowTemperatures);
+  const [isSimulationStreaming, setIsSimulationStreaming] = useState(false);
   const [simulationError, setSimulationError] = useState<string | null>(null);
-  const simulationMutation = useSimulationRun();
 
-  const simulationTotalSteps = simulationResult?.timeline.timesSeconds.length ?? 0;
   const simulationMaxIndex = Math.max(0, simulationTotalSteps - 1);
   const simulationProgress = simulationStep === null || simulationMaxIndex === 0 ? 0 : clamp01(simulationStep / simulationMaxIndex);
   const simulationActive = simulationStep !== null;
 
   useEffect(() => {
-    if (!isPlaybackRunning || !simulationResult || simulationTotalSteps <= 1) {
-      return;
-    }
-
-    const timer = window.setInterval(() => {
-      setSimulationStep((current) => {
-        if (current === null) {
-          return 0;
-        }
-        if (current >= simulationMaxIndex) {
-          window.clearInterval(timer);
-          setIsPlaybackRunning(false);
-          return simulationMaxIndex;
-        }
-        return current + 1;
-      });
-    }, SIMULATION_INTERVAL_MS);
-
-    return () => window.clearInterval(timer);
-  }, [isPlaybackRunning, simulationResult, simulationTotalSteps, simulationMaxIndex]);
+    return () => {
+      streamAbortRef.current?.abort();
+    };
+  }, []);
 
   const displayNodePositions = useMemo(() => {
-    if (!simulationActive || !simulationResult || simulationStep === null) {
+    if (!simulationActive || !liveNodePositions || simulationStep === null) {
       return nodePositions;
     }
 
-    const timeline = simulationResult.timeline.nodePositionsTimeline;
-    if (timeline.length === 0) {
-      return nodePositions;
-    }
-    const stepNodePositions = timeline[Math.min(simulationStep, timeline.length - 1)] ?? {};
     const warmupBlend = smoothStep(0, PLAYBACK_WARMUP_STEPS, simulationStep + 1);
     const blended: Record<string, number> = { ...nodePositions };
-    for (const [nodeId, targetValue] of Object.entries(stepNodePositions)) {
+    for (const [nodeId, targetValue] of Object.entries(liveNodePositions)) {
       blended[nodeId] = lerp(nodePositions[nodeId] ?? targetValue, targetValue, warmupBlend);
     }
     return blended;
-  }, [nodePositions, simulationActive, simulationResult, simulationStep]);
+  }, [nodePositions, simulationActive, liveNodePositions, simulationStep]);
 
   const displayDevices = devices;
 
-  const baselineRowTemperatures = useMemo<Record<RowId, number>>(() => {
-    if (!simulationResult?.timeline?.rowTemperatures) {
-      return defaultBaselineRowTemperatures;
-    }
-    const rowTimeline = simulationResult.timeline.rowTemperatures;
-    return {
-      row_a: timelineAt(rowTimeline.row_a, 0, defaultBaselineRowTemperatures.row_a),
-      row_b: timelineAt(rowTimeline.row_b, 0, defaultBaselineRowTemperatures.row_b),
-      row_c: timelineAt(rowTimeline.row_c, 0, defaultBaselineRowTemperatures.row_c),
-      row_d: timelineAt(rowTimeline.row_d, 0, defaultBaselineRowTemperatures.row_d),
-      row_e: timelineAt(rowTimeline.row_e, 0, defaultBaselineRowTemperatures.row_e),
-      row_f: timelineAt(rowTimeline.row_f, 0, defaultBaselineRowTemperatures.row_f),
-    };
-  }, [simulationResult]);
-
   const rowTemperatures = useMemo(() => {
-    if (!simulationActive || !simulationResult || simulationStep === null) {
+    if (!simulationActive || simulationStep === null) {
       return buildRowTemperatures(0);
     }
-
-    const rowTimeline = simulationResult.timeline.rowTemperatures;
-    if (!rowTimeline || Object.keys(rowTimeline).length === 0) {
+    if (!liveRowTemperatures) {
       return buildRowTemperatures(simulationProgress);
     }
 
     const warmupBlend = smoothStep(0, PLAYBACK_WARMUP_STEPS, simulationStep + 1);
-    const target = {
-      row_a: timelineAt(rowTimeline.row_a, simulationStep, baselineRowTemperatures.row_a),
-      row_b: timelineAt(rowTimeline.row_b, simulationStep, baselineRowTemperatures.row_b),
-      row_c: timelineAt(rowTimeline.row_c, simulationStep, baselineRowTemperatures.row_c),
-      row_d: timelineAt(rowTimeline.row_d, simulationStep, baselineRowTemperatures.row_d),
-      row_e: timelineAt(rowTimeline.row_e, simulationStep, baselineRowTemperatures.row_e),
-      row_f: timelineAt(rowTimeline.row_f, simulationStep, baselineRowTemperatures.row_f),
-    };
 
     return {
-      row_a: lerp(baselineRowTemperatures.row_a, target.row_a, warmupBlend),
-      row_b: lerp(baselineRowTemperatures.row_b, target.row_b, warmupBlend),
-      row_c: lerp(baselineRowTemperatures.row_c, target.row_c, warmupBlend),
-      row_d: lerp(baselineRowTemperatures.row_d, target.row_d, warmupBlend),
-      row_e: lerp(baselineRowTemperatures.row_e, target.row_e, warmupBlend),
-      row_f: lerp(baselineRowTemperatures.row_f, target.row_f, warmupBlend),
+      row_a: lerp(baselineRowTemperatures.row_a, liveRowTemperatures.row_a, warmupBlend),
+      row_b: lerp(baselineRowTemperatures.row_b, liveRowTemperatures.row_b, warmupBlend),
+      row_c: lerp(baselineRowTemperatures.row_c, liveRowTemperatures.row_c, warmupBlend),
+      row_d: lerp(baselineRowTemperatures.row_d, liveRowTemperatures.row_d, warmupBlend),
+      row_e: lerp(baselineRowTemperatures.row_e, liveRowTemperatures.row_e, warmupBlend),
+      row_f: lerp(baselineRowTemperatures.row_f, liveRowTemperatures.row_f, warmupBlend),
     };
-  }, [simulationActive, simulationResult, simulationStep, simulationProgress, baselineRowTemperatures]);
+  }, [simulationActive, simulationStep, simulationProgress, baselineRowTemperatures, liveRowTemperatures]);
 
   const startSimulation = async () => {
     setSimulationError(null);
-    setIsPlaybackRunning(false);
-    try {
-      const result = await simulationMutation.mutateAsync({
-        durationSeconds: SIMULATION_DURATION_SECONDS,
-        dtSeconds: 1,
-        failures: buildSimulationFailures(devices),
+    setSimulationStep(null);
+    setSimulationTotalSteps(0);
+    setLiveNodePositions(null);
+    setLiveRowTemperatures(null);
+    setBaselineRowTemperatures(defaultBaselineRowTemperatures);
+
+    streamAbortRef.current?.abort();
+    const abortController = new AbortController();
+    streamAbortRef.current = abortController;
+
+    let pendingFrame:
+      | {
+          nextStep: number;
+          nextTotal: number;
+          rowFrame: Record<RowId, number>;
+          nodeFrame: Record<string, number>;
+        }
+      | null = null;
+    let pendingAnimationFrame: number | null = null;
+
+    const commitPendingFrame = () => {
+      pendingAnimationFrame = null;
+      if (!pendingFrame) {
+        return;
+      }
+      const frame = pendingFrame;
+      pendingFrame = null;
+
+      if (frame.nextStep === 0) {
+        setBaselineRowTemperatures(frame.rowFrame);
+      }
+      setSimulationStep(frame.nextStep);
+      setSimulationTotalSteps(frame.nextTotal);
+      setLiveRowTemperatures(frame.rowFrame);
+      setLiveNodePositions(frame.nodeFrame);
+    };
+
+    const scheduleFrameCommit = (frame: {
+      nextStep: number;
+      nextTotal: number;
+      rowFrame: Record<RowId, number>;
+      nodeFrame: Record<string, number>;
+    }) => {
+      pendingFrame = frame;
+      if (pendingAnimationFrame !== null) {
+        return;
+      }
+      pendingAnimationFrame = window.requestAnimationFrame(commitPendingFrame);
+    };
+
+    const processStreamLine = (line: string) => {
+      const raw = line.trim();
+      if (!raw) {
+        return;
+      }
+      const payload = JSON.parse(raw) as Record<string, unknown>;
+      const type = typeof payload.type === 'string' ? payload.type : '';
+      if (type === 'error') {
+        const message = typeof payload.message === 'string' ? payload.message : 'Simulation stream failed';
+        throw new Error(message);
+      }
+      if (type === 'init') {
+        const initEvent = payload as unknown as SimulationInitEvent;
+        const total = Math.max(1, Math.floor(toNumber(initEvent.totalSteps, 1)));
+        setSimulationTotalSteps(total);
+        return;
+      }
+      if (type !== 'step') {
+        return;
+      }
+
+      const event = payload as unknown as SimulationStepEvent;
+      const nextStep = Math.max(0, Math.floor(toNumber(event.index, 0)));
+      const nextTotal = Math.max(nextStep + 1, Math.floor(toNumber(event.totalSteps, nextStep + 1)));
+      const rowFrame = toRowTemperatureFrame(event.rowTemperatures ?? {}, baselineRowTemperatures);
+      const nodeFrameEntries = Object.entries(event.nodePositions ?? {}).filter(
+        ([, value]) => typeof value === 'number' && Number.isFinite(value),
+      );
+      const nodeFrame = Object.fromEntries(nodeFrameEntries) as Record<string, number>;
+
+      scheduleFrameCommit({
+        nextStep,
+        nextTotal,
+        rowFrame,
+        nodeFrame,
       });
-      setSimulationResult(result);
-      setSimulationStep(0);
-      setIsPlaybackRunning(true);
+    };
+
+    setIsSimulationStreaming(true);
+    try {
+      const response = await fetch(buildBackendUrl('/api/simulation/stream'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortController.signal,
+        body: JSON.stringify({
+          durationSeconds: SIMULATION_DURATION_SECONDS,
+          dtSeconds: 1,
+          failures: buildSimulationFailures(devices),
+          includeDiscoveryAnalysis: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to run simulation: ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('Streaming is not available in this browser');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          processStreamLine(line);
+        }
+      }
+
+      const trailing = buffer.trim();
+      if (trailing) {
+        processStreamLine(trailing);
+      }
+
+      if (pendingAnimationFrame !== null) {
+        window.cancelAnimationFrame(pendingAnimationFrame);
+        pendingAnimationFrame = null;
+      }
+      commitPendingFrame();
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Simulation failed';
       setSimulationError(message);
+    } finally {
+      if (pendingAnimationFrame !== null) {
+        window.cancelAnimationFrame(pendingAnimationFrame);
+        pendingAnimationFrame = null;
+      }
+      if (streamAbortRef.current === abortController) {
+        streamAbortRef.current = null;
+      }
+      setIsSimulationStreaming(false);
     }
-  };
-
-  const restartSimulationPlayback = () => {
-    if (!simulationResult) {
-      return;
-    }
-    setSimulationError(null);
-    setSimulationStep(0);
-    setIsPlaybackRunning(true);
   };
 
   const clampTransform = useCallback((x: number, y: number, scale: number) => {
@@ -964,16 +1071,14 @@ export default function DatacenterMap({
   const zoomIn = () => setTransform((current) => clampTransform(current.x, current.y, current.scale * 1.25));
   const zoomOut = () => setTransform((current) => clampTransform(current.x, current.y, current.scale / 1.25));
   const resetView = () => setTransform({ x: 0, y: 0, scale: 1 });
-  const runSimulationLabel = simulationMutation.isPending
-    ? 'Running backend simulation'
-    : isPlaybackRunning
-      ? 'Restart simulation'
-      : simulationStep === null
-        ? 'Run simulation'
-        : 'Run simulation again';
+  const runSimulationLabel = isSimulationStreaming
+    ? 'Running live simulation'
+    : simulationStep === null
+      ? 'Run simulation'
+      : 'Run simulation again';
+  const progressPercent = Math.round(simulationProgress * 100);
   const handleSimulationButtonClick = () => {
-    if (isPlaybackRunning && simulationResult) {
-      restartSimulationPlayback();
+    if (isSimulationStreaming) {
       return;
     }
     void startSimulation();
@@ -986,18 +1091,25 @@ export default function DatacenterMap({
         actions={
           <>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  onClick={handleSimulationButtonClick}
-                  disabled={simulationMutation.isPending}
-                  aria-label={runSimulationLabel}
-                  title={runSimulationLabel}
-                >
-                  {simulationMutation.isPending ? <LoaderCircle className="animate-spin" /> : isPlaybackRunning ? <Pause size={16} /> : <Play size={16} />}
-                  <span className="sr-only">{runSimulationLabel}</span>
-                </Button>
-              </TooltipTrigger>
+              <div className="flex items-center gap-2">
+                {isSimulationStreaming && (
+                  <span className="text-[11px] font-display text-muted-foreground min-w-[44px] text-right">
+                    {progressPercent}%
+                  </span>
+                )}
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    onClick={handleSimulationButtonClick}
+                    disabled={isSimulationStreaming}
+                    aria-label={runSimulationLabel}
+                    title={runSimulationLabel}
+                  >
+                    {isSimulationStreaming ? <LoaderCircle className="animate-spin" /> : <Play size={16} />}
+                    <span className="sr-only">{runSimulationLabel}</span>
+                  </Button>
+                </TooltipTrigger>
+              </div>
               <TooltipContent side="bottom" className="text-[12px] font-display">
                 {runSimulationLabel}
               </TooltipContent>

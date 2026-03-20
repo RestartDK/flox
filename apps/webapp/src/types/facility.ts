@@ -242,6 +242,7 @@ export interface SimulationRunRequest {
   durationSeconds?: number;
   dtSeconds?: number;
   failures?: SimulationFailureInput[];
+  includeDiscoveryAnalysis?: boolean;
 }
 
 export interface SimulationTimeline {

@@ -334,6 +334,7 @@ class SimulationRunRequest(BaseModel):
     durationSeconds: float = Field(default=600.0, ge=30.0, le=3600.0)
     dtSeconds: float = Field(default=1.0, ge=0.2, le=10.0)
     failures: list[SimulationFailureInput] = Field(default_factory=list)
+    includeDiscoveryAnalysis: bool = False
 
 
 class SimulationTimelineView(BaseModel):
