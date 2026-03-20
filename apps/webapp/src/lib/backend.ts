@@ -18,8 +18,10 @@ export const getBackendBaseUrl = () => {
     isProduction: Boolean(env.PROD),
   });
   if (resolved) {
-    return resolved;
-  }
+        console.log(`Using backend URL: ${resolved}`);
+        return resolved;
+    }
+    console.warn('No backend URL configured, defaulting to localhost');
 
   return `http://127.0.0.1:${DEFAULT_DEV_BACKEND_PORT}`;
 };
