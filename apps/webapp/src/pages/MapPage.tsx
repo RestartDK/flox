@@ -29,8 +29,9 @@ export default function MapPage() {
   const hoveredDevice = !selectedDeviceId && hoveredDeviceId
     ? (devices.find(d => d.id === hoveredDeviceId) ?? null)
     : null;
-  const panelDevice = pinnedDevice ?? hoveredDevice;
-  const panelMode: 'pinned' | 'peek' = pinnedDevice ? 'pinned' : 'peek';
+
+  const activeDevice = pinnedDevice ?? hoveredDevice;
+  const mode = pinnedDevice ? 'pinned' : 'peek';
 
   return (
     <>
@@ -43,7 +44,15 @@ export default function MapPage() {
         onDeviceHoverEnd={handleDeviceHoverEnd}
         selectedDeviceId={selectedDeviceId}
       />
-      <DeviceDetailPanel device={panelDevice} mode={panelMode} onClose={() => setSelectedDeviceId(null)} />
+      <div
+        className="shrink-0 transition-[width] duration-300"
+        style={{ width: pinnedDevice ? 360 : 0, transitionTimingFunction: 'cubic-bezier(0.2,0,0,1)' }}
+      />
+      <DeviceDetailPanel
+        device={activeDevice}
+        mode={mode}
+        onClose={() => setSelectedDeviceId(null)}
+      />
     </>
   );
 }
