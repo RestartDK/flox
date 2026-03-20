@@ -11,7 +11,7 @@ export const buildIssueResultPrompt = ({ device, fault }: IssueAlertSelection) =
   `Recommendation: ${fault.recommendation}`,
   `Estimated impact: ${fault.estimatedImpact}`,
   `Energy waste: ${fault.energyWaste}`,
-  'Explain the likely next operational steps, and if on-site intervention or phone escalation is necessary, call the voice escalation tool.',
+  'Explain the likely next operational steps, propose the concrete change in chat first, and if on-site intervention or phone escalation is necessary, call the voice escalation tool.',
 ].join('\n');
 
 export const buildAgentRouteStateForIssue = (selection: IssueAlertSelection): AgentRouteState => ({

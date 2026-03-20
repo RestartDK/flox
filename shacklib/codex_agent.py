@@ -70,7 +70,9 @@ def _system_prompt() -> str:
         "Use tools whenever you need current platform data. "
         "Never invent IDs, metrics, or fault states. "
         "When the user asks to execute an action, call the matching tool. "
-        "Keep answers short and operationally useful.\n\n"
+        "Keep answers short and operationally useful. "
+        "Before any mutating tool call, first state the proposed operational change in chat in one concise sentence. "
+        "This applies to resolve_fault and escalate_fault. "
         "IMPORTANT: You have full ability to place phone calls via the escalate_fault tool. "
         "Never say you cannot place calls or send escalations. "
         "When the user asks to escalate or call about a fault or node, you MUST call escalate_fault. "
@@ -403,6 +405,46 @@ def _pending_action_summary(name: str, arguments: dict[str, Any]) -> str:
     return f"Execute `{name}`"
 
 
+def _fault_for_reply(fault_id: str) -> dict[str, Any] | None:
+    if not fault_id:
+        return None
+
+    state = read_state()
+    faults = state.get("faults") if isinstance(state.get("faults"), dict) else {}
+    fault = faults.get(fault_id) if isinstance(faults, dict) else None
+    if not isinstance(fault, dict):
+        return None
+    return fault
+
+
+def _proposal_prefix(name: str, arguments: dict[str, Any]) -> str:
+    fault_id = str(arguments.get("faultId") or "").strip()
+    fault = _fault_for_reply(fault_id)
+
+    if name == "resolve_fault":
+        if fault_id:
+            return f"Proposed change: resolve fault `{fault_id}`."
+        return "Proposed change: resolve the requested fault."
+
+    if name == "escalate_fault":
+        recommendation = ""
+        if isinstance(fault, dict):
+            recommendation = str(fault.get("recommendedAction") or "").strip()
+        if fault_id and recommendation:
+            return (
+                f"Proposed next step: escalate fault `{fault_id}` to the on-site engineer by phone "
+                f"and ask them to {recommendation}."
+            )
+        if fault_id:
+            return (
+                f"Proposed next step: escalate fault `{fault_id}` to the on-site engineer by phone "
+                "for on-site intervention."
+            )
+        return "Proposed next step: place the requested escalation call."
+
+    return f"Proposed change: execute `{name}`."
+
+
 def _tool_get_system_overview() -> dict[str, Any]:
     def _mutator(state: dict[str, Any]) -> dict[str, Any]:
         payload = build_status_payload(state)
@@ -719,21 +761,35 @@ def _fallback_overview_reply(error: str) -> dict[str, Any]:
     }
 
 
-def _pending_action_reply(name: str, arguments: dict[str, Any], action_id: str) -> str:
+def _pending_action_reply(
+    name: str,
+    arguments: dict[str, Any],
+    action_id: str,
+    assistant_text: str = "",
+) -> str:
+    proposal = assistant_text.strip() or _proposal_prefix(name, arguments)
+
     if name == "resolve_fault":
         fault_id = str(arguments.get("faultId") or "unknown")
-        return (
+        approval = (
             f"I can resolve fault `{fault_id}` now. Approve this action to apply the change. "
             f"Pending action id: {action_id}."
         )
-    if name == "escalate_fault":
+    elif name == "escalate_fault":
         fault_id = str(arguments.get("faultId") or "unknown")
         to_number = _escalation_phone_number() or "the configured escalation number"
-        return (
+        approval = (
             f"I am ready to call {to_number} about `{fault_id}`. "
             f"Approve this action to place the call. Pending action id: {action_id}."
         )
-    return f"I need approval before executing `{name}`. Pending action id: {action_id}."
+    else:
+        approval = (
+            f"I need approval before executing `{name}`. Pending action id: {action_id}."
+        )
+
+    if not proposal:
+        return approval
+    return f"{proposal}\n\n{approval}"
 
 
 def _handle_pending_decision(
@@ -915,6 +971,7 @@ def run_codex_agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
 
                 if name in _MUTATING_TOOLS:
                     pending = _create_pending_action(name, arguments, actor)
+                    assistant_text = _extract_output_text(response_payload)
                     tool_events.append(
                         {
                             "name": name,
@@ -926,7 +983,12 @@ def run_codex_agent_chat(payload: dict[str, Any]) -> dict[str, Any]:
                         }
                     )
                     return {
-                        "reply": _pending_action_reply(name, arguments, pending["id"]),
+                        "reply": _pending_action_reply(
+                            name,
+                            arguments,
+                            pending["id"],
+                            assistant_text=assistant_text,
+                        ),
                         "model": str(response_payload.get("model") or _agent_model()),
                         "generatedAt": utc_now_iso(),
                         "usedFallback": False,
