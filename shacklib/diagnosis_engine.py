@@ -536,21 +536,6 @@ def _device_status(node_status: str | None) -> str:
     return "healthy"
 
 
-def _parse_daily_amount(value: str) -> float:
-    digits = "".join(char for char in value if char.isdigit() or char in {".", ","})
-    if not digits:
-        return 0.0
-    return float(digits.replace(",", ""))
-
-
-def _format_currency_per_day(value: float) -> str:
-    return f"${round(value):,}/day"
-
-
-def _format_energy_waste_per_day(value: float) -> str:
-    return f"{round(value)} kWh/day"
-
-
 def _catalog_from_state(state: dict[str, Any]) -> dict[str, Any]:
     catalog = deepcopy(state.get("catalog") or build_catalog())
     nodes = state.get("nodes") or {}
