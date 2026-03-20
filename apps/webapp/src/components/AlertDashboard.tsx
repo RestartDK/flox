@@ -11,7 +11,6 @@ import IssueResolveButton from '@/components/IssueResolveButton';
 
 interface AlertDashboardProps {
   devices: Device[];
-  onNavigateToDevice: (device: Device) => void;
   onOpenIssueResult: (selection: IssueAlertSelection) => void;
 }
 
@@ -44,7 +43,7 @@ const fmtTs = (value: string) => {
     : date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssueResult }: AlertDashboardProps) {
+export default function AlertDashboard({ devices, onOpenIssueResult }: AlertDashboardProps) {
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [deviceFilter, setDeviceFilter] = useState<string | null>(null);
   const [expandedFaultId, setExpandedFaultId] = useState<string | null>(null);
@@ -126,7 +125,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
               <div key={alert.fault.id}>
                 <div
                   className={`data-row cursor-pointer group ${isExpanded ? 'bg-muted/30' : ''}`}
-                  onClick={() => onNavigateToDevice(alert.device)}
+                  onClick={() => setExpandedFaultId(isExpanded ? null : alert.fault.id)}
                 >
                   <div className="flex min-w-0 flex-1 gap-1.5">
                     <button

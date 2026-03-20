@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import AgentPage from '@/pages/AgentPage';
 import DeviceDetailPanel from '@/components/DeviceDetailPanel';
 import DeviceDashboardPage from '@/pages/DeviceDashboardPage';
@@ -105,11 +105,6 @@ const AgentStateProbe = () => {
   return <pre data-testid="agent-state">{JSON.stringify(location.state)}</pre>;
 };
 
-const DeviceProbe = () => {
-  const { deviceId } = useParams();
-  return <div data-testid="device-page">{deviceId}</div>;
-};
-
 const AgentPageWithStateProbe = () => {
   const location = useLocation();
   return (
@@ -149,7 +144,6 @@ describe('issues to agent handoff', () => {
           <Route element={withOutletContext()}>
             <Route path="/issues" element={<IssuesPage />} />
             <Route path="/agent" element={<AgentStateProbe />} />
-            <Route path="/issues/:deviceId" element={<DeviceProbe />} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -177,14 +171,13 @@ describe('issues to agent handoff', () => {
     expect(prompt).toContain('call the voice escalation tool');
   });
 
-  it('keeps row click navigation to the device detail page', async () => {
+  it('toggles the issue details when the row is clicked', async () => {
     render(
       <MemoryRouter initialEntries={['/issues']}>
         <Routes>
           <Route element={withOutletContext()}>
             <Route path="/issues" element={<IssuesPage />} />
             <Route path="/agent" element={<AgentStateProbe />} />
-            <Route path="/issues/:deviceId" element={<DeviceProbe />} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -192,7 +185,7 @@ describe('issues to agent handoff', () => {
 
     fireEvent.click(screen.getByText('Actuator stall'));
 
-    expect(await screen.findByTestId('device-page')).toHaveTextContent(device.id);
+    expect(screen.getByText(device.faults[0].recommendation)).toBeInTheDocument();
   });
 
   it('uses the same agent handoff when Resolve is clicked from the device overview', async () => {

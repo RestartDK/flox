@@ -10,7 +10,6 @@ export default function IssuesPage() {
   return (
     <AlertDashboard
       devices={devices}
-      onNavigateToDevice={(device) => navigate(`/issues/${device.id}`)}
       onOpenIssueResult={(selection) => navigate('/agent', { state: buildAgentRouteStateForIssue(selection) })}
     />
   );
