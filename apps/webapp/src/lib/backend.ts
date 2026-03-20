@@ -1,4 +1,7 @@
-const DEFAULT_PRODUCTION_BACKEND_URL = 'https://starthack26-backend-production.up.railway.app';
+import {
+  DEFAULT_DEV_BACKEND_PORT,
+  resolveBackendBaseUrl,
+} from './backendConfig';
 
 const getRuntimeEnv = (): Record<string, string | boolean | undefined> => {
   const withEnv = import.meta as ImportMeta & {
@@ -9,16 +12,16 @@ const getRuntimeEnv = (): Record<string, string | boolean | undefined> => {
 
 export const getBackendBaseUrl = () => {
   const env = getRuntimeEnv();
-  const configured = typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL.replace(/\/$/, '') : '';
-  if (configured) {
-    return configured;
+  const configured = typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined;
+  const resolved = resolveBackendBaseUrl({
+    explicitUrl: configured,
+    isProduction: Boolean(env.PROD),
+  });
+  if (resolved) {
+    return resolved;
   }
 
-  if (env.PROD) {
-    return DEFAULT_PRODUCTION_BACKEND_URL;
-  }
-
-  return '';
+  return `http://127.0.0.1:${DEFAULT_DEV_BACKEND_PORT}`;
 };
 
 export const buildBackendUrl = (path: string) => {

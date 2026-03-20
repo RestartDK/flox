@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterator
 
 from ml.bayesian import (
     build_component_failure_priors,
@@ -173,6 +173,184 @@ def run_simulation_bundle(
         "discovery": discovery,
         "bayesian": bayesian,
         "events": candidate_result.events,
+    }
+
+
+def stream_simulation_bundle(
+    *,
+    duration_seconds: float,
+    dt_seconds: float,
+    failures_payload: list[dict[str, Any]],
+    status_payload: dict[str, Any] | None,
+    generated_at: str,
+    include_discovery_analysis: bool = False,
+) -> Iterator[dict[str, Any]]:
+    effective_failures = (
+        failures_payload
+        if failures_payload
+        else _infer_failures_from_status(status_payload)
+    )
+    failure_events = [_to_failure_event(item) for item in effective_failures]
+
+    topology = build_datacenter_topology()
+    warm_state = _build_warm_state(topology=topology, dt_seconds=dt_seconds)
+    baseline_state = clone_state(warm_state)
+    candidate_state = clone_state(warm_state)
+    baseline_state.active_failures = []
+    candidate_state.active_failures = list(failure_events)
+
+    baseline_engine = build_default_engine(topology)
+    candidate_engine = build_default_engine(topology)
+    status_node_positions = _extract_status_node_positions(status_payload)
+    step_count = max(1, int(round(duration_seconds / dt_seconds)))
+    total_steps = step_count + 1
+
+    zone_ids = list(candidate_state.zones.keys())
+    focus_zone_id = "zone_ef"
+    baseline_zone_peaks = {zone_id: 0.0 for zone_id in zone_ids}
+    candidate_zone_peaks = {zone_id: 0.0 for zone_id in zone_ids}
+    baseline_cpu_peak = 0.0
+    candidate_cpu_peak = 0.0
+    time_to_first_throttle_baseline: float | None = None
+    time_to_first_throttle_candidate: float | None = None
+    time_to_first_shutdown_baseline: float | None = None
+    time_to_first_shutdown_candidate: float | None = None
+
+    yield {
+        "type": "init",
+        "generatedAt": generated_at,
+        "durationSeconds": duration_seconds,
+        "dtSeconds": dt_seconds,
+        "totalSteps": total_steps,
+    }
+
+    for index in range(total_steps):
+        if index > 0:
+            baseline_engine.step(baseline_state)
+            candidate_engine.step(candidate_state)
+
+        baseline_zone_temps = {
+            zone_id: baseline_state.zones[zone_id].average_temp_c()
+            for zone_id in zone_ids
+        }
+        candidate_zone_temps = {
+            zone_id: candidate_state.zones[zone_id].average_temp_c()
+            for zone_id in zone_ids
+        }
+        for zone_id in zone_ids:
+            baseline_zone_peaks[zone_id] = max(
+                baseline_zone_peaks[zone_id], baseline_zone_temps[zone_id]
+            )
+            candidate_zone_peaks[zone_id] = max(
+                candidate_zone_peaks[zone_id], candidate_zone_temps[zone_id]
+            )
+
+        baseline_max_cpu, baseline_throttled, baseline_shutdown = _cpu_metrics(
+            baseline_state
+        )
+        candidate_max_cpu, candidate_throttled, candidate_shutdown = _cpu_metrics(
+            candidate_state
+        )
+        baseline_cpu_peak = max(baseline_cpu_peak, baseline_max_cpu)
+        candidate_cpu_peak = max(candidate_cpu_peak, candidate_max_cpu)
+
+        current_time = float(candidate_state.time_s)
+        if time_to_first_throttle_baseline is None and baseline_throttled > 0:
+            time_to_first_throttle_baseline = current_time
+        if time_to_first_throttle_candidate is None and candidate_throttled > 0:
+            time_to_first_throttle_candidate = current_time
+        if time_to_first_shutdown_baseline is None and baseline_shutdown > 0:
+            time_to_first_shutdown_baseline = current_time
+        if time_to_first_shutdown_candidate is None and candidate_shutdown > 0:
+            time_to_first_shutdown_candidate = current_time
+
+        yield {
+            "type": "step",
+            "index": index,
+            "totalSteps": total_steps,
+            "timeSeconds": round(current_time, 3),
+            "nodePositions": _build_node_positions_frame(
+                status_node_positions=status_node_positions,
+                baseline_state=baseline_state,
+                candidate_state=candidate_state,
+            ),
+            "rowTemperatures": _build_row_temperatures_frame(candidate_state),
+        }
+
+    zone_peak_delta_by_zone = {
+        zone_id: round(candidate_zone_peaks[zone_id] - baseline_zone_peaks[zone_id], 3)
+        for zone_id in zone_ids
+    }
+    most_impacted_zone_id = (
+        max(zone_peak_delta_by_zone, key=zone_peak_delta_by_zone.get)
+        if zone_peak_delta_by_zone
+        else focus_zone_id
+    )
+    baseline_focus_peak = baseline_zone_peaks.get(focus_zone_id, 0.0)
+    candidate_focus_peak = candidate_zone_peaks.get(focus_zone_id, 0.0)
+    discovery: dict[str, Any] = {
+        "focus_zone_id": focus_zone_id,
+        "zone_peak_delta_by_zone": zone_peak_delta_by_zone,
+        "most_impacted_zone_id": most_impacted_zone_id,
+        "max_zone_peak_delta_c": zone_peak_delta_by_zone.get(
+            most_impacted_zone_id, 0.0
+        ),
+        "baseline_zone_peak_c": round(baseline_focus_peak, 3),
+        "candidate_zone_peak_c": round(candidate_focus_peak, 3),
+        "zone_peak_delta_c": round(candidate_focus_peak - baseline_focus_peak, 3),
+        "baseline_cpu_peak_c": round(baseline_cpu_peak, 3),
+        "candidate_cpu_peak_c": round(candidate_cpu_peak, 3),
+        "cpu_peak_delta_c": round(candidate_cpu_peak - baseline_cpu_peak, 3),
+        "time_to_first_throttle_baseline_s": time_to_first_throttle_baseline,
+        "time_to_first_throttle_candidate_s": time_to_first_throttle_candidate,
+        "time_to_first_shutdown_baseline_s": time_to_first_shutdown_baseline,
+        "time_to_first_shutdown_candidate_s": time_to_first_shutdown_candidate,
+    }
+    if include_discovery_analysis:
+        advanced_discovery = run_discovery_analysis(
+            duration_seconds=duration_seconds,
+            dt_seconds=dt_seconds,
+            candidate_failures=failure_events,
+            trials=DISCOVERY_TRIALS,
+        )
+        discovery.update(advanced_discovery)
+
+    simulation_context = _build_simulation_context(discovery)
+    candidate_component_priors = build_component_failure_priors(
+        requested_failures=effective_failures,
+        status_payload=status_payload,
+    )
+    baseline_component_priors = build_component_failure_priors(
+        requested_failures=[],
+        status_payload=None,
+    )
+    baseline_bayesian_result = run_datacenter_inference(
+        component_failure_priors=baseline_component_priors,
+        simulation_context={},
+    )
+    candidate_bayesian_result = run_datacenter_inference(
+        component_failure_priors=candidate_component_priors,
+        simulation_context=simulation_context,
+    )
+    bayesian = serialize_bayesian_result(candidate_bayesian_result)
+    bayesian["summary"] = _build_bayesian_summary_with_delta(
+        baseline_serialized=serialize_bayesian_result(baseline_bayesian_result),
+        candidate_serialized=bayesian,
+    )
+    bayesian["explainability"] = _build_bayesian_explainability(
+        baseline_serialized=serialize_bayesian_result(baseline_bayesian_result),
+        candidate_serialized=bayesian,
+        simulation_context=simulation_context,
+    )
+
+    yield {
+        "type": "complete",
+        "generatedAt": generated_at,
+        "durationSeconds": duration_seconds,
+        "dtSeconds": dt_seconds,
+        "discovery": discovery,
+        "bayesian": bayesian,
+        "events": list(candidate_state.events),
     }
 
 
@@ -501,6 +679,116 @@ def _extract_status_node_positions(
         except (TypeError, ValueError):
             continue
     return result
+
+
+def _cpu_metrics(state) -> tuple[float, int, int]:
+    max_cpu = 0.0
+    throttled = 0
+    shutdown = 0
+    for zone in state.zones.values():
+        for rack in zone.racks.values():
+            max_cpu = max(max_cpu, float(rack.cpu_temp_c))
+            if rack.throttled:
+                throttled += 1
+            if rack.shutdown:
+                shutdown += 1
+    return max_cpu, throttled, shutdown
+
+
+def _build_row_temperatures_frame(state) -> dict[str, float]:
+    zone_ab = state.zones.get("zone_ab")
+    zone_cd = state.zones.get("zone_cd")
+    zone_ef = state.zones.get("zone_ef")
+    return {
+        "row_a": round(float(zone_ab.cold_aisle_temp_c if zone_ab else 24.0), 4),
+        "row_b": round(float(zone_ab.hot_aisle_temp_c if zone_ab else 30.0), 4),
+        "row_c": round(float(zone_cd.cold_aisle_temp_c if zone_cd else 24.0), 4),
+        "row_d": round(float(zone_cd.hot_aisle_temp_c if zone_cd else 30.0), 4),
+        "row_e": round(float(zone_ef.cold_aisle_temp_c if zone_ef else 24.0), 4),
+        "row_f": round(float(zone_ef.hot_aisle_temp_c if zone_ef else 30.0), 4),
+    }
+
+
+def _build_node_positions_frame(
+    *,
+    status_node_positions: dict[str, float],
+    baseline_state,
+    candidate_state,
+) -> dict[str, float]:
+    baseline_zone_ab = baseline_state.zones.get("zone_ab")
+    baseline_zone_cd = baseline_state.zones.get("zone_cd")
+    baseline_zone_ef = baseline_state.zones.get("zone_ef")
+    candidate_zone_ab = candidate_state.zones.get("zone_ab")
+    candidate_zone_cd = candidate_state.zones.get("zone_cd")
+    candidate_zone_ef = candidate_state.zones.get("zone_ef")
+
+    factors = {
+        "zone_ab_supply": _ratio(
+            float(candidate_zone_ab.supply_flow_m3s if candidate_zone_ab else 0.0),
+            float(baseline_zone_ab.supply_flow_m3s if baseline_zone_ab else 0.0),
+        ),
+        "zone_cd_supply": _ratio(
+            float(candidate_zone_cd.supply_flow_m3s if candidate_zone_cd else 0.0),
+            float(baseline_zone_cd.supply_flow_m3s if baseline_zone_cd else 0.0),
+        ),
+        "zone_ef_supply": _ratio(
+            float(candidate_zone_ef.supply_flow_m3s if candidate_zone_ef else 0.0),
+            float(baseline_zone_ef.supply_flow_m3s if baseline_zone_ef else 0.0),
+        ),
+        "zone_ab_exhaust": _ratio(
+            float(candidate_zone_ab.exhaust_flow_m3s if candidate_zone_ab else 0.0),
+            float(baseline_zone_ab.exhaust_flow_m3s if baseline_zone_ab else 0.0),
+        ),
+        "zone_cd_exhaust": _ratio(
+            float(candidate_zone_cd.exhaust_flow_m3s if candidate_zone_cd else 0.0),
+            float(baseline_zone_cd.exhaust_flow_m3s if baseline_zone_cd else 0.0),
+        ),
+        "zone_ef_exhaust": _ratio(
+            float(candidate_zone_ef.exhaust_flow_m3s if candidate_zone_ef else 0.0),
+            float(baseline_zone_ef.exhaust_flow_m3s if baseline_zone_ef else 0.0),
+        ),
+    }
+
+    return {
+        "BEL-VNT-001": _scale_position(
+            status_node_positions,
+            "BEL-VNT-001",
+            (
+                factors["zone_ab_supply"]
+                + factors["zone_cd_supply"]
+                + factors["zone_ef_supply"]
+            )
+            / 3.0,
+        ),
+        "BEL-VNT-003": _scale_position(
+            status_node_positions, "BEL-VNT-003", factors["zone_ab_supply"]
+        ),
+        "BEL-VNT-005": _scale_position(
+            status_node_positions, "BEL-VNT-005", factors["zone_cd_supply"]
+        ),
+        "BEL-VNT-007": _scale_position(
+            status_node_positions, "BEL-VNT-007", factors["zone_ef_supply"]
+        ),
+        "BEL-VNT-002": _scale_position(
+            status_node_positions, "BEL-VNT-002", factors["zone_ab_exhaust"]
+        ),
+        "BEL-VNT-004": _scale_position(
+            status_node_positions, "BEL-VNT-004", factors["zone_cd_exhaust"]
+        ),
+        "BEL-VNT-006": _scale_position(
+            status_node_positions, "BEL-VNT-006", factors["zone_ef_exhaust"]
+        ),
+        "BEL-VNT-008": _scale_position(
+            status_node_positions,
+            "BEL-VNT-008",
+            (
+                factors["zone_ab_exhaust"]
+                + factors["zone_cd_exhaust"]
+                + factors["zone_ef_exhaust"]
+            )
+            / 3.0,
+        ),
+    }
 
 
 def _build_simulation_context(discovery: dict[str, Any]) -> dict[str, float]:
