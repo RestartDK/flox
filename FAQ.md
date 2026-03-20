@@ -13,7 +13,7 @@ Flox is a monitoring and fault-intelligence platform for HVAC actuators. It help
 
 ## 2) What problem does it solve?
 
-Most buildings collect device data but do not turn it into clear action. Flox translates raw signals into fault alerts and recommended actions so teams can reduce downtime, avoid comfort issues, and cut energy waste.
+Most buildings collect device data but do not turn it into clear action. Flox translates raw signals into fault alerts and recommended actions so teams can reduce downtime, avoid comfort issues, and improve reliability.
 
 **Technical note:** Faults are detected at device level and propagated up the node hierarchy (actuator -> AHU -> plant), so system-level health reflects downstream conditions.
 
@@ -126,7 +126,7 @@ Start with three checks:
 
 ### 15) Why does this matter right now?
 
-Energy costs are volatile, sustainability targets are rising, and maintenance teams are stretched. Flox focuses on reducing avoidable waste and downtime using data that many facilities already collect.
+Operational complexity is rising and maintenance teams are stretched. Flox focuses on reducing avoidable downtime and repeated issues using data that many facilities already collect.
 
 **Technical note:** The product leverages existing actuator telemetry, which lowers adoption friction versus projects that require full hardware replacement.
 
@@ -138,13 +138,13 @@ Most dashboards show alerts; Flox is built to help teams decide what to do first
 
 ### 17) What measurable value should a customer expect?
 
-The expected value is faster response, fewer repeated failures, and lower energy waste from unresolved actuator issues.
+The expected value is faster response and fewer repeated failures from unresolved actuator issues.
 
-**Technical note:** Core success metrics are MTTD, MTTR, high-severity fault recurrence, and estimated cost avoided per resolved fault.
+**Technical note:** Core success metrics are MTTD, MTTR, high-severity fault recurrence, and resolution quality per resolved fault.
 
 ### 18) How would you prove ROI in a pilot?
 
-Start small, compare before and after, and report concrete results tied to maintenance and energy outcomes.
+Start small, compare before and after, and report concrete results tied to maintenance and reliability outcomes.
 
 **Technical note:** A practical pilot uses a baseline period and a monitored period, then compares response time, recurrence, and issue closure quality.
 
@@ -192,9 +192,9 @@ Defensibility comes from becoming part of day-to-day operations, not just being 
 
 ### 26) What does success look like after 6-12 months?
 
-Success means teams rely on Flox during daily operations and can point to measurable savings and reliability improvements.
+Success means teams rely on Flox during daily operations and can point to measurable reliability improvements.
 
-**Technical note:** Targets can include reduced critical fault duration, lower repeat incidents, and documented cost or energy impact across pilot sites.
+**Technical note:** Targets can include reduced critical fault duration, lower repeat incidents, and documented response improvements across pilot sites.
 
 ### 27) If you were judging this project, why would it stand out?
 

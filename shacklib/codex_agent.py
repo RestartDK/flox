@@ -529,6 +529,7 @@ def _tool_resolve_fault(arguments: dict[str, Any], actor: str) -> dict[str, Any]
 
     return update_state(_mutator)
 
+
 def _tool_escalate_fault(arguments: dict[str, Any]) -> dict[str, Any]:
     fault_id = str(arguments.get("faultId") or "").strip()
     to_number = _escalation_phone_number()
@@ -585,8 +586,6 @@ def _tool_escalate_fault(arguments: dict[str, Any]) -> dict[str, Any]:
                     fault.get("recommendedAction") or "Contact operations team."
                 ),
                 detected_at=detected_at,
-                estimated_impact=str(fault.get("estimatedImpact") or ""),
-                energy_waste=str(fault.get("energyWaste") or ""),
                 triggered_by="Belimo Ops Copilot",
             )
         except (ElevenLabsConfigurationError, ElevenLabsWebhookPayloadError) as exc:

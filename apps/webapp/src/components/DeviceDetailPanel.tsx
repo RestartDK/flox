@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
-  Zap,
   Clock,
   Wrench,
   Loader2,
@@ -204,7 +203,6 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
                             </div>
                             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                               <div className="flex items-center gap-3">
-                                <span className="flex items-center gap-1"><Zap size={10} />{fault.energyWaste}</span>
                                 <span className="flex items-center gap-1"><Clock size={10} />{new Date(fault.detectedAt).toLocaleDateString()}</span>
                               </div>
                               <IssueResolveButton

@@ -30,11 +30,6 @@ class TelemetryPoint(BaseModel):
     value: float
 
 
-class FaultImpactMeta(BaseModel):
-    estimatedImpact: str
-    energyWaste: str
-
-
 class LiveFaultView(BaseModel):
     id: str
     state: Literal["open"]
@@ -61,8 +56,6 @@ class FrontendFaultView(BaseModel):
     diagnosis: str
     recommendation: str
     detectedAt: str
-    estimatedImpact: str
-    energyWaste: str
 
 
 class DeviceView(BaseModel):
@@ -128,8 +121,6 @@ class BuildingStatsView(BaseModel):
     warningDevices: int
     faultDevices: int
     overallHealth: float
-    energyWaste: str
-    estimatedCost: str
     activeFaults: int
 
 
@@ -137,7 +128,6 @@ class CatalogView(BaseModel):
     deviceTemplates: list[DeviceTemplateView]
     zones: list[ZoneView]
     ahuUnits: list[AHUUnitView]
-    faultMetaByDeviceId: dict[str, FaultImpactMeta]
 
 
 class DerivedView(BaseModel):
@@ -311,8 +301,6 @@ class ElevenLabsOutboundCallRequest(BaseModel):
     severity: str = Field(min_length=1)
     recommendedAction: str = Field(min_length=1)
     detectedAt: str = Field(min_length=1)
-    estimatedImpact: str = Field(default="")
-    energyWaste: str = Field(default="")
     triggeredBy: str = Field(default="automated fault classifier")
 
 

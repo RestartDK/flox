@@ -51,8 +51,6 @@ Native ElevenLabs CLI project for the `On-Site Engineer Escalation` voice agent.
   - `failure_summary`
   - `recommended_action`
   - `detected_at`
-  - `estimated_impact`
-  - `energy_waste`
   - `triggered_by`
 - Success evaluation, data collection, and post-call webhook wiring are still best reviewed in the dashboard after the first push, then pulled back into repo once ElevenLabs materializes the exact stored schema.
 - If the dashboard is used for experimentation, pull those changes back into this folder before treating them as final.
