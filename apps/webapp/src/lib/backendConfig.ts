@@ -31,13 +31,13 @@ export const resolveBackendBaseUrl = ({
   explicitUrl,
   isProduction,
 }: BackendBaseUrlOptions): string | undefined => {
+  if (isProduction) {
+    return DEFAULT_PRODUCTION_BACKEND_URL;
+  }
+
   const normalizedExplicitUrl = normalizeExplicitUrl(explicitUrl);
   if (normalizedExplicitUrl) {
     return normalizedExplicitUrl;
-  }
-
-  if (isProduction) {
-    return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
   return undefined;

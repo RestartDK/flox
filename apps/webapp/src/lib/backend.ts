@@ -12,7 +12,8 @@ const getRuntimeEnv = (): Record<string, string | boolean | undefined> => {
 
 export const getBackendBaseUrl = () => {
   const env = getRuntimeEnv();
-  const configured = typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined;
+  const configured =
+    !env.PROD && typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined;
   const resolved = resolveBackendBaseUrl({
     explicitUrl: configured,
     isProduction: Boolean(env.PROD),

@@ -13,9 +13,11 @@ const DEFAULT_DEV_FRONTEND_PORT = 3000;
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const backendPort = env.BACKEND_PORT || DEFAULT_DEV_BACKEND_PORT;
+  const explicitBackendUrl =
+    mode === "production" ? undefined : env.VITE_BACKEND_URL || env.BACKEND_URL;
   const backendTarget =
     resolveBackendBaseUrl({
-      explicitUrl: env.VITE_BACKEND_URL || env.BACKEND_URL,
+      explicitUrl: explicitBackendUrl,
       isProduction: mode === "production",
     }) || `http://127.0.0.1:${backendPort}`;
 
