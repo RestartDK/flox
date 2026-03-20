@@ -120,7 +120,55 @@ def test_codex_agent_escalation_pending_action_uses_configured_number(monkeypatc
     assert pending is not None
     assert pending["name"] == "escalate_fault"
     assert pending["summary"] == "Call +41790001122 about `fault-seed-0004`"
+    assert "Proposed next step:" in response["reply"]
     assert "+41790001122" in response["reply"]
+
+
+def test_codex_agent_preserves_proposal_text_before_escalation_approval(monkeypatch):
+    _reset_memory_state(monkeypatch, build_seed_state())
+    monkeypatch.setenv("ESCALATION_PHONE_NUMBER", "+41790001122")
+
+    def _fake_openai_request(_input_payload):
+        return {
+            "model": "gpt-5.4",
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": (
+                                "Proposed next step: dispatch the on-site engineer to inspect the linkage "
+                                "assembly and re-home the actuator."
+                            ),
+                        }
+                    ],
+                },
+                {
+                    "type": "function_call",
+                    "call_id": "call_test_escalate",
+                    "name": "escalate_fault",
+                    "arguments": '{"faultId":"fault-seed-0004","engineerName":"On-Site Engineer"}',
+                },
+            ],
+        }
+
+    monkeypatch.setattr(codex_agent, "_openai_request", _fake_openai_request)
+
+    response = codex_agent.run_codex_agent_chat(
+        {
+            "messages": [
+                {"role": "user", "content": "Call the on-site engineer about `fault-seed-0004`"}
+            ],
+            "actor": "test-user",
+        }
+    )
+
+    assert (
+        "dispatch the on-site engineer to inspect the linkage assembly and re-home the actuator"
+        in response["reply"]
+    )
+    assert "Approve this action to place the call." in response["reply"]
 
 
 def test_system_prompt_includes_uploaded_document_context_with_truncation(monkeypatch):

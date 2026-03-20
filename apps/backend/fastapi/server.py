@@ -1,6 +1,7 @@
 import os
 import json
 import threading
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 import uvicorn
@@ -12,22 +13,28 @@ from fastapi.responses import StreamingResponse
 from schemas import (
     AgentChatRequest,
     AgentChatResponse,
+    BayesianView,
     DocumentListItem,
     DocumentUploadResponse,
     ElevenLabsOutboundCallRequest,
     ElevenLabsOutboundCallResponse,
     ElevenLabsWebhookReceipt,
-    BayesianView,
     IngestPayload,
     IngestResponse,
     MlFailureModeRequest,
     MlFailureModeResponse,
     NodeFaultHistoryResponse,
-    SimulationRunRequest,
-    SimulationRunResponse,
     ResolveFaultRequest,
     ResolveFaultResponse,
+    SimulationRunRequest,
+    SimulationRunResponse,
     StatusResponse,
+)
+
+from ml.bayesian import (
+    build_component_failure_priors,
+    run_datacenter_inference,
+    serialize_bayesian_result,
 )
 from shacklib.backend_state import (
     delete_building_document,
@@ -39,26 +46,14 @@ from shacklib.backend_state import (
     set_building_document_content,
     update_state,
 )
-from ml.bayesian import (
-    build_component_failure_priors,
-    run_datacenter_inference,
-    serialize_bayesian_result,
-)
 from shacklib.codex_agent import run_codex_agent_chat
 from shacklib.diagnosis_engine import (
-    build_status_payload,
     build_node_fault_history_payload,
+    build_status_payload,
     ingest_node,
     resolve_fault,
     utc_now_iso,
 )
-from shacklib.ml_inference_client import (
-    MLInferenceError,
-    infer_failure_mode_for_node,
-    resolve_ml_url,
-)
-from shacklib.simulation_service import run_simulation_bundle, stream_simulation_bundle
-from shacklib.state_seed import seed_state_on_startup
 from shacklib.elevenlabs_agent import (
     ElevenLabsConfigurationError,
     ElevenLabsSignatureError,
@@ -67,13 +62,30 @@ from shacklib.elevenlabs_agent import (
     record_post_call_webhook_event,
     validate_and_normalize_post_call_webhook,
 )
+from shacklib.ml_inference_client import (
+    MLInferenceError,
+    infer_failure_mode_for_node,
+    resolve_ml_url,
+)
+from shacklib.simulation_service import run_simulation_bundle, stream_simulation_bundle
+from shacklib.state_seed import seed_state_on_startup
 
 load_dotenv()
 
 ALLOWED_DOCUMENT_EXTENSIONS = {".pdf", ".txt", ".md"}
 MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    ensure_storage_ready()
+    seeded = update_state(seed_state_on_startup)
+    if seeded:
+        print("[backend-fastapi] seeded reproducible startup telemetry state")
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -87,14 +99,6 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
-
-
-@app.on_event("startup")
-async def startup() -> None:
-    ensure_storage_ready()
-    seeded = update_state(seed_state_on_startup)
-    if seeded:
-        print("[backend-fastapi] seeded reproducible startup telemetry state")
 
 
 def extract_text(filename: str, data: bytes) -> str:

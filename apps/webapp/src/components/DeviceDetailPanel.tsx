@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import {
   X,
   Clock,
@@ -66,6 +65,10 @@ const formatTimestamp = (value: string) => {
 export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: DeviceDetailPanelProps) {
   const isPeek = mode === 'peek';
   const navigate = useNavigate();
+  const lastDeviceRef = useRef<Device | null>(null);
+  if (device) lastDeviceRef.current = device;
+  const displayDevice = device ?? lastDeviceRef.current;
+  const isOpen = !!device;
   const historyQuery = useNodeFaultHistory(device?.id ?? null, 10);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const currentDeviceId = device?.id ?? null;
@@ -75,27 +78,21 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
   }, [currentDeviceId]);
 
   return (
-    <AnimatePresence mode="wait">
-      {device && (
-        <motion.div
-          key={`${device.id}-${mode}`}
-          initial={isPeek ? { x: 360, opacity: 0 } : { width: 0, opacity: 0 }}
-          animate={isPeek ? { x: 0, opacity: 1 } : { width: 360, opacity: 1 }}
-          exit={isPeek ? { x: 360, opacity: 0 } : { width: 0, opacity: 0 }}
-          transition={{ duration: isPeek ? 0.18 : 0.24, ease: [0.2, 0, 0, 1] }}
-          className={isPeek
-            ? 'absolute right-0 top-0 z-30 h-full w-[360px] border-l border-border bg-card shadow-xl pointer-events-none'
-            : 'h-full shrink-0 overflow-hidden border-l border-border bg-card'
-          }
-        >
-          <div className={isPeek ? 'w-[360px]' : 'w-[360px] h-full overflow-y-auto'}>
+    <div
+      className={`absolute right-0 top-0 z-30 h-full w-[360px] pointer-events-none transition-transform duration-200 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      style={{ transitionTimingFunction: 'cubic-bezier(0.2,0,0,1)' }}
+    >
+      {displayDevice && (
+        <div className={`w-[360px] h-full overflow-y-auto border-l border-border bg-card transition-shadow duration-200 ${
+          isPeek ? 'shadow-xl' : 'shadow-none pointer-events-auto'
+        }`}>
           <div className={`h-16 shrink-0 flex items-center justify-between border-b border-border px-5 ${isPeek ? '' : 'card-accent-top'}`}>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-display text-base tracking-tight">{device.name}</span>
+                <span className="font-display text-base tracking-tight">{displayDevice.name}</span>
                 {!isPeek && (
                   <Link
-                    to={`/devices/${device.id}`}
+                    to={`/devices/${displayDevice.id}`}
                     className="text-muted-foreground transition-colors hover:text-foreground"
                     title="View full device details"
                   >
@@ -103,7 +100,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
                   </Link>
                 )}
               </div>
-              <div className="text-[11px] text-muted-foreground">{device.id}</div>
+              <div className="text-[11px] text-muted-foreground">{displayDevice.id}</div>
             </div>
             {!isPeek && (
               <button onClick={onClose} className="p-1 text-muted-foreground transition-colors hover:text-foreground">
@@ -114,13 +111,13 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
 
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <div className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${device.status === 'healthy' ? 'bg-status-healthy' : device.status === 'warning' ? 'bg-status-warning' : 'bg-status-fault'}`} />
-              <span className={`text-[13px] font-medium capitalize ${statusStyles[device.status]}`}>{device.status}</span>
+              <span className={`h-2 w-2 rounded-full ${displayDevice.status === 'healthy' ? 'bg-status-healthy' : displayDevice.status === 'warning' ? 'bg-status-warning' : 'bg-status-fault'}`} />
+              <span className={`text-[13px] font-medium capitalize ${statusStyles[displayDevice.status]}`}>{displayDevice.status}</span>
             </div>
             <div className="text-right">
               <div className="label-caps">Confidence</div>
-              <div className={`font-display text-lg ${device.anomalyScore > 0.7 ? 'text-status-fault' : device.anomalyScore > 0.4 ? 'text-status-warning' : 'text-status-healthy'}`}>
-                {formatAnomalyConfidence(device.anomalyScore)}
+              <div className={`font-display text-lg ${displayDevice.anomalyScore > 0.7 ? 'text-status-fault' : displayDevice.anomalyScore > 0.4 ? 'text-status-warning' : 'text-status-healthy'}`}>
+                {formatAnomalyConfidence(displayDevice.anomalyScore)}
               </div>
             </div>
           </div>
@@ -133,8 +130,8 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
             </div>
             <div className="border border-border bg-background/60 px-3 py-2">
               <div className="label-caps">Open Faults</div>
-              <div className={`mt-1 font-display text-lg ${device.faults.length > 0 ? 'text-status-fault' : 'text-status-healthy'}`}>
-                {historyQuery.data?.openFaults ?? device.faults.length}
+              <div className={`mt-1 font-display text-lg ${displayDevice.faults.length > 0 ? 'text-status-fault' : 'text-status-healthy'}`}>
+                {historyQuery.data?.openFaults ?? displayDevice.faults.length}
               </div>
               <div className="text-[11px] text-muted-foreground">Active on this device</div>
             </div>
@@ -142,11 +139,11 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
 
           <div className="grid grid-cols-2 gap-3 border-b border-border px-5 py-3">
             {[
-              { label: 'Zone', value: device.zone },
-              { label: 'Type', value: device.type },
-              { label: 'Model', value: device.model },
-              { label: 'Serial', value: device.serial },
-              { label: 'Installed', value: device.installedDate },
+              { label: 'Zone', value: displayDevice.zone },
+              { label: 'Type', value: displayDevice.type },
+              { label: 'Model', value: displayDevice.model },
+              { label: 'Serial', value: displayDevice.serial },
+              { label: 'Installed', value: displayDevice.installedDate },
             ].map((meta) => (
               <div key={meta.label}>
                 <div className="label-caps">{meta.label}</div>
@@ -159,9 +156,9 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
             <div className="label-caps mb-3">Live Telemetry (24h)</div>
             <div className="space-y-4">
               {[
-                { label: 'Torque (Nm)', data: device.torque, color: 'hsl(var(--brand))' },
-                { label: 'Position (%)', data: device.position, color: 'hsl(var(--foreground))' },
-                { label: 'Temperature (°C)', data: device.temperature, color: 'hsl(var(--status-warning))' },
+                { label: 'Torque (Nm)', data: displayDevice.torque, color: 'hsl(var(--brand))' },
+                { label: 'Position (%)', data: displayDevice.position, color: 'hsl(var(--foreground))' },
+                { label: 'Temperature (°C)', data: displayDevice.temperature, color: 'hsl(var(--status-warning))' },
               ].map((telemetry) => (
                 <div key={telemetry.label} className="flex items-center justify-between gap-3">
                   <div>
@@ -182,11 +179,11 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
 
           {!isPeek && (
             <>
-              {device.faults.length > 0 && (
+              {displayDevice.faults.length > 0 && (
                 <div className="border-b border-border px-5 py-4">
-                  <div className="label-caps mb-3">Active Faults ({device.faults.length})</div>
+                  <div className="label-caps mb-3">Active Faults ({displayDevice.faults.length})</div>
                   <div className="space-y-3">
-                    {device.faults.map((fault) => {
+                    {displayDevice.faults.map((fault) => {
                       return (
                         <div key={fault.id} className="border border-border bg-card p-3 fault-card-accent">
                           <div className="text-[13px] font-medium">{fault.type}</div>
@@ -207,7 +204,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
                               </div>
                               <IssueResolveButton
                                 onClick={() => navigate('/agent', {
-                                  state: buildAgentRouteStateForIssue({ device, fault }),
+                                  state: buildAgentRouteStateForIssue({ device: displayDevice, fault }),
                                 })}
                               />
                             </div>
@@ -218,7 +215,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
                   </div>
 
                   <Link
-                    to={`/devices/${device.id}`}
+                    to={`/devices/${displayDevice.id}`}
                     className="mt-3 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors border border-border px-2 py-1"
                   >
                     <ExternalLink size={10} />View all fault details
@@ -226,7 +223,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
                 </div>
               )}
 
-              {device.faults.length === 0 && (
+              {displayDevice.faults.length === 0 && (
                 <div className="border-b border-border px-5 py-8 text-center">
                   <div className="font-display text-sm text-status-healthy">No Active Faults</div>
                   <div className="mt-1 text-[12px] text-muted-foreground">Device operating within normal parameters</div>
@@ -316,8 +313,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
           )}
 
           </div>
-        </motion.div>
       )}
-    </AnimatePresence>
+    </div>
   );
 }

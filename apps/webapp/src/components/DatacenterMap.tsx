@@ -1085,7 +1085,7 @@ export default function DatacenterMap({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300" style={{ transitionTimingFunction: 'cubic-bezier(0.2,0,0,1)' }}>
       <PageHeader
         title="Datacenter Overview"
         actions={
