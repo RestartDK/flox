@@ -9,8 +9,6 @@ export const buildIssueResultPrompt = ({ device, fault }: IssueAlertSelection) =
   `Detected at: ${fault.detectedAt}`,
   `Diagnosis: ${fault.diagnosis}`,
   `Recommendation: ${fault.recommendation}`,
-  `Estimated impact: ${fault.estimatedImpact}`,
-  `Energy waste: ${fault.energyWaste}`,
   'Explain the likely next operational steps, propose the concrete change in chat first, and if on-site intervention or phone escalation is necessary, call the voice escalation tool.',
 ].join('\n');
 

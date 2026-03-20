@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { type Device, type Fault, type IssueAlertSelection } from '@/types/facility';
 import {
   AlertOctagon, AlertTriangle, ChevronDown, Clock, ExternalLink,
-  type LucideIcon, Siren, Wrench, Zap,
+  type LucideIcon, Siren, Wrench,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import PageHeader from '@/components/PageHeader';
@@ -29,11 +29,6 @@ interface SummaryCard {
 }
 
 const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-
-const parseEnergyWaste = (value: string) => {
-  const match = value.match(/([\d,.]+)/);
-  return match ? Number(match[1].replace(/,/g, '')) : 0;
-};
 
 const severityBadge: Record<string, string> = {
   critical: 'bg-status-fault/15 text-status-fault border-status-fault/30',
@@ -62,19 +57,17 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
   const filtered = alerts
     .filter(alert => !severityFilter || alert.fault.severity === severityFilter)
     .filter(alert => !deviceFilter || alert.device.id === deviceFilter);
-  const totalEnergyWaste = `${alerts.reduce((sum, alert) => sum + parseEnergyWaste(alert.fault.energyWaste), 0).toLocaleString()} kWh/day`;
   const summaryCards: SummaryCard[] = [
     { label: 'Critical', count: alerts.filter(alert => alert.fault.severity === 'critical').length, color: 'border-status-fault/30', text: 'text-status-fault', icon: AlertOctagon },
     { label: 'High', count: alerts.filter(alert => alert.fault.severity === 'high').length, color: 'border-status-warning/30', text: 'text-status-warning', icon: Siren },
     { label: 'Medium', count: alerts.filter(alert => alert.fault.severity === 'medium').length, color: 'border-border', text: 'text-muted-foreground', icon: AlertTriangle },
-    { label: 'Total Energy Waste', count: totalEnergyWaste, color: 'border-border', text: 'text-foreground', icon: Zap },
   ];
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <PageHeader title="Issues" />
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="mb-6 grid grid-cols-4 gap-3">
+        <div className="mb-6 grid grid-cols-3 gap-3">
           {summaryCards.map((card) => {
             const Icon = card.icon;
             const isActive = severityFilter === card.label.toLowerCase();
@@ -83,7 +76,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
               <div
                 key={card.label}
                 className={`cursor-pointer border bg-card p-4 shadow-sm transition-shadow hover:shadow-md ${isActive ? 'card-accent-top border-foreground' : card.color}`}
-                onClick={() => setSeverityFilter(isActive ? null : card.label === 'Total Energy Waste' ? null : card.label.toLowerCase())}
+                onClick={() => setSeverityFilter(isActive ? null : card.label.toLowerCase())}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="label-caps">{card.label}</div>
@@ -121,7 +114,7 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
             <span className="label-caps flex-1">Fault</span>
             <span className="label-caps w-28">Device</span>
             <span className="label-caps w-28">Zone</span>
-            <span className="label-caps w-24">Impact</span>
+            <span className="label-caps w-32">Detected</span>
             <span className="label-caps w-20">Severity</span>
             <span className="w-20" />
           </div>
@@ -158,11 +151,8 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
                   </div>
                   <div className="w-28 text-[12px] font-display text-secondary-foreground">{alert.device.id}</div>
                   <div className="w-28 truncate text-[12px] text-muted-foreground">{alert.device.zone}</div>
-                  <div className="w-24">
-                    <div className="flex items-center gap-1 text-[12px] font-display text-foreground">
-                      <Zap size={10} />
-                      {alert.fault.energyWaste}
-                    </div>
+                  <div className="w-32">
+                    <div className="truncate text-[12px] text-muted-foreground">{fmtTs(alert.fault.detectedAt)}</div>
                   </div>
                   <div className="flex w-20 items-center justify-center self-center">
                     <span className={`inline-block border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${severityBadge[alert.fault.severity]}`}>
@@ -207,11 +197,6 @@ export default function AlertDashboard({ devices, onNavigateToDevice, onOpenIssu
                             <Clock size={11} />
                             Detected {fmtTs(alert.fault.detectedAt)}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Zap size={11} />
-                            {alert.fault.energyWaste}
-                          </span>
-                          <span>{alert.fault.estimatedImpact}</span>
                         </div>
 
                         <div className="flex items-center gap-3 pt-1">

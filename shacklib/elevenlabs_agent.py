@@ -28,8 +28,6 @@ _DYNAMIC_VARIABLE_KEYS = (
     "failure_summary",
     "recommended_action",
     "detected_at",
-    "estimated_impact",
-    "energy_waste",
     "triggered_by",
 )
 
@@ -138,8 +136,6 @@ def place_outbound_call(
     severity: str,
     recommended_action: str,
     detected_at: str,
-    estimated_impact: str,
-    energy_waste: str,
     triggered_by: str,
 ) -> dict[str, Any]:
     """Place an outbound call via ElevenLabs Twilio integration.
@@ -168,8 +164,6 @@ def place_outbound_call(
         severity=severity,
         recommended_action=recommended_action,
         detected_at=detected_at,
-        estimated_impact=estimated_impact,
-        energy_waste=energy_waste,
         triggered_by=triggered_by,
     )
 

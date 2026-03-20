@@ -46,7 +46,10 @@ def test_normalize_post_call_transcription_event_extracts_structured_results():
                         }
                     },
                     "data_collection_results": {
-                        "acknowledged": {"value": True, "rationale": "Engineer confirmed"},
+                        "acknowledged": {
+                            "value": True,
+                            "rationale": "Engineer confirmed",
+                        },
                         "callback_eta": {
                             "value": "15 minutes",
                             "rationale": "Engineer gave ETA",
@@ -92,7 +95,10 @@ def test_normalize_post_call_transcription_event_extracts_structured_results():
     )
     assert normalized["futureEscalationAttempt"]["acknowledged"] is True
     assert normalized["futureEscalationAttempt"]["callbackEta"] == "15 minutes"
-    assert normalized["futureEscalationAttempt"]["engineerResponseSummary"] == "Will inspect shortly."
+    assert (
+        normalized["futureEscalationAttempt"]["engineerResponseSummary"]
+        == "Will inspect shortly."
+    )
     assert normalized["futureEscalationAttempt"]["needsFollowUp"] is False
 
 
@@ -149,7 +155,9 @@ def test_validate_and_normalize_post_call_webhook_uses_sdk_signature_validation(
             self.webhooks = _FakeWebhooks()
 
     monkeypatch.setenv("ELEVENLABS_WEBHOOK_SECRET", "secret-123")
-    monkeypatch.setattr(elevenlabs_agent, "get_elevenlabs_client", lambda: _FakeClient())
+    monkeypatch.setattr(
+        elevenlabs_agent, "get_elevenlabs_client", lambda: _FakeClient()
+    )
 
     normalized = elevenlabs_agent.validate_and_normalize_post_call_webhook(
         payload=b'{"ok":true}',
@@ -176,8 +184,6 @@ def test_build_outbound_dynamic_variables_requires_engineer_briefing_fields():
         failure_summary="The valve is stuck and airflow is outside the target range.",
         recommended_action="Inspect the valve actuator and confirm whether manual override is required.",
         detected_at="2026-03-19T09:30:00Z",
-        estimated_impact="$280/day",
-        energy_waste="145 kWh/day",
         triggered_by="facility-manager",
     )
 
@@ -192,7 +198,9 @@ def test_post_call_webhook_endpoint_records_normalized_audit_event(monkeypatch):
 
     monkeypatch.setattr(server, "ensure_storage_ready", lambda: None)
     monkeypatch.setattr(server, "update_state", lambda mutator: mutator(state))
-    monkeypatch.setattr(elevenlabs_agent, "update_state", lambda mutator: mutator(state))
+    monkeypatch.setattr(
+        elevenlabs_agent, "update_state", lambda mutator: mutator(state)
+    )
     monkeypatch.setattr(
         server,
         "validate_and_normalize_post_call_webhook",
@@ -207,7 +215,11 @@ def test_post_call_webhook_endpoint_records_normalized_audit_event(monkeypatch):
             },
         },
     )
-    monkeypatch.setattr(server, "record_post_call_webhook_event", elevenlabs_agent.record_post_call_webhook_event)
+    monkeypatch.setattr(
+        server,
+        "record_post_call_webhook_event",
+        elevenlabs_agent.record_post_call_webhook_event,
+    )
 
     with TestClient(server.app) as client:
         response = client.post(

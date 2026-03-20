@@ -360,8 +360,6 @@ async def elevenlabs_outbound_call(
             severity=payload.severity,
             recommended_action=payload.recommendedAction,
             detected_at=payload.detectedAt,
-            estimated_impact=payload.estimatedImpact,
-            energy_waste=payload.energyWaste,
             triggered_by=payload.triggeredBy,
         )
     except ElevenLabsConfigurationError as exc:

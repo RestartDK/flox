@@ -16,8 +16,6 @@ export interface Fault {
   diagnosis: string;
   recommendation: string;
   detectedAt: string;
-  estimatedImpact: string;
-  energyWaste: string;
 }
 
 export interface Device {
@@ -89,8 +87,6 @@ export interface BuildingStats {
   warningDevices: number;
   faultDevices: number;
   overallHealth: number;
-  energyWaste: string;
-  estimatedCost: string;
   activeFaults: number;
 }
 
@@ -120,16 +116,10 @@ export interface DeviceTemplate {
   temperature: TelemetryPoint[];
 }
 
-export interface FaultImpactMeta {
-  estimatedImpact: string;
-  energyWaste: string;
-}
-
 export interface FacilityCatalog {
   deviceTemplates: DeviceTemplate[];
   zones: Zone[];
   ahuUnits: AHUUnit[];
-  faultMetaByDeviceId: Record<string, FaultImpactMeta>;
 }
 
 export interface FacilityDerivedPayload {

@@ -536,21 +536,6 @@ def _device_status(node_status: str | None) -> str:
     return "healthy"
 
 
-def _parse_daily_amount(value: str) -> float:
-    digits = "".join(char for char in value if char.isdigit() or char in {".", ","})
-    if not digits:
-        return 0.0
-    return float(digits.replace(",", ""))
-
-
-def _format_currency_per_day(value: float) -> str:
-    return f"${round(value):,}/day"
-
-
-def _format_energy_waste_per_day(value: float) -> str:
-    return f"{round(value)} kWh/day"
-
-
 def _catalog_from_state(state: dict[str, Any]) -> dict[str, Any]:
     catalog = deepcopy(state.get("catalog") or build_catalog())
     nodes = state.get("nodes") or {}
@@ -645,12 +630,10 @@ def _build_history_payload(nodes: dict[str, dict[str, Any]]) -> dict[str, Any]:
 def _build_frontend_faults(
     node: dict[str, Any],
     fault: dict[str, Any] | None,
-    fault_meta_by_device_id: dict[str, dict[str, str]],
 ) -> list[dict[str, Any]]:
     if not fault:
         return []
 
-    fault_meta = fault_meta_by_device_id.get(node["id"], {})
     return [
         {
             "id": fault.get("id"),
@@ -662,10 +645,6 @@ def _build_frontend_faults(
             "diagnosis": fault.get("summary") or "",
             "recommendation": fault.get("recommendedAction") or "",
             "detectedAt": fault.get("openedAt") or utc_now_iso(),
-            "estimatedImpact": fault_meta.get(
-                "estimatedImpact", "$0/day impact estimate pending"
-            ),
-            "energyWaste": fault_meta.get("energyWaste", "0 kWh/day"),
         }
     ]
 
@@ -676,7 +655,6 @@ def _build_derived_devices(
     faults: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     nodes = state.get("nodes") or {}
-    fault_meta_by_device_id = catalog.get("faultMetaByDeviceId") or {}
     devices: list[dict[str, Any]] = []
 
     for template in catalog.get("deviceTemplates", []):
@@ -713,7 +691,6 @@ def _build_derived_devices(
                 "faults": _build_frontend_faults(
                     {"id": template["id"], **node},
                     open_fault,
-                    fault_meta_by_device_id,
                 ),
             }
         )
@@ -727,17 +704,6 @@ def _build_building_stats(devices: list[dict[str, Any]]) -> dict[str, Any]:
     warning_devices = sum(1 for device in devices if device["status"] == "warning")
     fault_devices = sum(1 for device in devices if device["status"] == "fault")
     active_faults = sum(len(device["faults"]) for device in devices)
-
-    total_energy_waste = sum(
-        _parse_daily_amount(fault["energyWaste"])
-        for device in devices
-        for fault in device["faults"]
-    )
-    total_estimated_cost = sum(
-        _parse_daily_amount(fault["estimatedImpact"])
-        for device in devices
-        for fault in device["faults"]
-    )
 
     status_score = {
         "healthy": 100,
@@ -759,8 +725,6 @@ def _build_building_stats(devices: list[dict[str, Any]]) -> dict[str, Any]:
         "warningDevices": warning_devices,
         "faultDevices": fault_devices,
         "overallHealth": overall_health,
-        "energyWaste": _format_energy_waste_per_day(total_energy_waste),
-        "estimatedCost": _format_currency_per_day(total_estimated_cost),
         "activeFaults": active_faults,
     }
 
