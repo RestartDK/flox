@@ -46,7 +46,7 @@ export default function DevicesPage() {
             <span className="label-caps w-28">Zone</span>
             <span className="label-caps w-24">Type</span>
             <span className="label-caps w-20">Faults</span>
-            <span className="label-caps w-24">Deviation</span>
+            <span className="label-caps w-24">Confidence</span>
           </div>
 
           {sorted.map(device => (

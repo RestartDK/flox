@@ -119,7 +119,7 @@ export default function DeviceDetailPanel({ device, mode = 'pinned', onClose }: 
               <span className={`text-[13px] font-medium capitalize ${statusStyles[device.status]}`}>{device.status}</span>
             </div>
             <div className="text-right">
-              <div className="label-caps">Deviation from normal</div>
+              <div className="label-caps">Confidence</div>
               <div className={`font-display text-lg ${device.anomalyScore > 0.7 ? 'text-status-fault' : device.anomalyScore > 0.4 ? 'text-status-warning' : 'text-status-healthy'}`}>
                 {formatAnomalyConfidence(device.anomalyScore)}
               </div>
