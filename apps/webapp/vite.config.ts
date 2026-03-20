@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
   const backendPort = env.BACKEND_PORT || DEFAULT_DEV_BACKEND_PORT;
   const backendTarget =
     resolveBackendBaseUrl({
-      explicitUrl: env.VITE_BACKEND_URL,
+      explicitUrl: env.VITE_BACKEND_URL || env.BACKEND_URL,
       isProduction: mode === "production",
     }) || `http://127.0.0.1:${backendPort}`;
 

@@ -9,11 +9,29 @@ type BackendBaseUrlOptions = {
 
 const trimTrailingSlash = (value?: string) => value?.replace(/\/$/, "");
 
+const stripWrappingQuotes = (value?: string) => {
+  if (!value) {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.replace(/^['\"]|['\"]$/g, "");
+};
+
+const normalizeExplicitUrl = (value?: string) => {
+  const normalized = trimTrailingSlash(stripWrappingQuotes(value));
+  if (!normalized) {
+    return undefined;
+  }
+
+  return /^https?:\/\//.test(normalized) ? normalized : undefined;
+};
+
 export const resolveBackendBaseUrl = ({
   explicitUrl,
   isProduction,
 }: BackendBaseUrlOptions): string | undefined => {
-  const normalizedExplicitUrl = trimTrailingSlash(explicitUrl);
+  const normalizedExplicitUrl = normalizeExplicitUrl(explicitUrl);
   if (normalizedExplicitUrl) {
     return normalizedExplicitUrl;
   }
