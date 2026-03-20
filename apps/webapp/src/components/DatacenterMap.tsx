@@ -116,7 +116,9 @@ const averageFlow = (nodePositions: Record<string, number>, ids: string[]) => {
   return ids.reduce((sum, id) => sum + (nodePositions[id] ?? 0), 0) / ids.length;
 };
 
-const SIMULATION_INTERVAL_MS = 80;
+const SIMULATION_PLAYBACK_TARGET_MS = 18_000;
+const SIMULATION_INTERVAL_MIN_MS = 20;
+const SIMULATION_INTERVAL_MAX_MS = 80;
 const PLAYBACK_WARMUP_STEPS = 18;
 const SIMULATION_DURATION_SECONDS = 300;
 const DUCT_PARTICLE_DENSITY_MULTIPLIER = 1.8;
@@ -808,6 +810,27 @@ export default function DatacenterMap({
   const simulationMaxIndex = Math.max(0, simulationTotalSteps - 1);
   const simulationProgress = simulationStep === null || simulationMaxIndex === 0 ? 0 : clamp01(simulationStep / simulationMaxIndex);
   const simulationActive = simulationStep !== null;
+  const playbackTiming = useMemo(() => {
+    if (simulationMaxIndex <= 0) {
+      return {
+        intervalMs: SIMULATION_INTERVAL_MAX_MS,
+        stepStride: 1,
+      };
+    }
+
+    const maxTickCount = Math.max(1, Math.floor(SIMULATION_PLAYBACK_TARGET_MS / SIMULATION_INTERVAL_MIN_MS));
+    const stepStride = Math.max(1, Math.ceil(simulationMaxIndex / maxTickCount));
+    const tickCount = Math.max(1, Math.ceil(simulationMaxIndex / stepStride));
+    const intervalMs = Math.max(
+      SIMULATION_INTERVAL_MIN_MS,
+      Math.min(SIMULATION_INTERVAL_MAX_MS, Math.floor(SIMULATION_PLAYBACK_TARGET_MS / tickCount)),
+    );
+
+    return {
+      intervalMs,
+      stepStride,
+    };
+  }, [simulationMaxIndex]);
 
   useEffect(() => {
     if (!isPlaybackRunning || !simulationResult || simulationTotalSteps <= 1) {
@@ -824,12 +847,12 @@ export default function DatacenterMap({
           setIsPlaybackRunning(false);
           return simulationMaxIndex;
         }
-        return current + 1;
+        return Math.min(simulationMaxIndex, current + playbackTiming.stepStride);
       });
-    }, SIMULATION_INTERVAL_MS);
+    }, playbackTiming.intervalMs);
 
     return () => window.clearInterval(timer);
-  }, [isPlaybackRunning, simulationResult, simulationTotalSteps, simulationMaxIndex]);
+  }, [isPlaybackRunning, simulationResult, simulationTotalSteps, simulationMaxIndex, playbackTiming]);
 
   const displayNodePositions = useMemo(() => {
     if (!simulationActive || !simulationResult || simulationStep === null) {
@@ -904,6 +927,7 @@ export default function DatacenterMap({
         durationSeconds: SIMULATION_DURATION_SECONDS,
         dtSeconds: 1,
         failures: buildSimulationFailures(devices),
+        includeDiscoveryAnalysis: false,
       });
       setSimulationResult(result);
       setSimulationStep(0);

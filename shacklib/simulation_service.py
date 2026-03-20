@@ -34,6 +34,8 @@ DEVICE_TO_COMPONENT_ID = {
     for component_id, device_id in COMPONENT_TO_DEVICE_ID.items()
 }
 
+DISCOVERY_TRIALS = 4
+
 
 def run_simulation_bundle(
     *,
@@ -42,6 +44,7 @@ def run_simulation_bundle(
     failures_payload: list[dict[str, Any]],
     status_payload: dict[str, Any] | None,
     generated_at: str,
+    include_discovery_analysis: bool = False,
 ) -> dict[str, Any]:
     effective_failures = (
         failures_payload
@@ -71,13 +74,14 @@ def run_simulation_bundle(
     )
 
     discovery = discovery_report(baseline_result, candidate_result)
-    advanced_discovery = run_discovery_analysis(
-        duration_seconds=duration_seconds,
-        dt_seconds=dt_seconds,
-        candidate_failures=failure_events,
-        trials=8,
-    )
-    discovery.update(advanced_discovery)
+    if include_discovery_analysis:
+        advanced_discovery = run_discovery_analysis(
+            duration_seconds=duration_seconds,
+            dt_seconds=dt_seconds,
+            candidate_failures=failure_events,
+            trials=DISCOVERY_TRIALS,
+        )
+        discovery.update(advanced_discovery)
     simulation_context = _build_simulation_context(discovery)
     candidate_component_priors = build_component_failure_priors(
         requested_failures=effective_failures,

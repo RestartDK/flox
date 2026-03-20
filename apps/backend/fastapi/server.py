@@ -377,6 +377,7 @@ async def run_simulation(payload: SimulationRunRequest) -> SimulationRunResponse
         failures_payload=[item.model_dump(mode="python") for item in payload.failures],
         status_payload=status_payload,
         generated_at=utc_now_iso(),
+        include_discovery_analysis=payload.includeDiscoveryAnalysis,
     )
     return SimulationRunResponse.model_validate(response)
 
