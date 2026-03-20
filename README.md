@@ -36,7 +36,7 @@ Flox closes that gap:
 1. **Telemetry ingest** — actuator signals are ingested in real time and persisted with full history per variable per device.
 2. **Fault classification** — a Celery worker runs a continuous diagnosis cycle. Heuristic rules detect known failure modes (stiction, high-torque anomaly, temperature drift, signal loss). An optional ML inference server extends this with trained classifiers.
 3. **Fault propagation** — device-level faults roll up through the node hierarchy (actuator → AHU → plant), so system-level health reflects the worst downstream condition.
-4. **Facility dashboard** — a live map view shows zone health, device positions, and active faults across the building. An issues panel lists all open faults ranked by severity, with energy waste and estimated cost impact per fault.
+4. **Facility dashboard** — a live map view shows zone health, device positions, and active faults across the building. An issues panel lists all open faults ranked by severity with diagnosis context and recommended actions.
 5. **Operations agent** — a Claude-powered agent answers natural-language questions about faults, runs diagnosis on demand, retrieves fault history, and can execute corrective actions with explicit operator approval before any write is committed.
 
 
