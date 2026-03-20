@@ -43,7 +43,7 @@ export default function DeviceDashboard({
           <span className="font-display text-sm capitalize">{device.status}</span>
         </div>
         <div className="h-4 w-px bg-border" />
-        <span className="font-display text-sm">{anomalyPct}% deviation</span>
+        <span className="font-display text-sm">{anomalyPct}% confidence</span>
         <div className="h-4 w-px bg-border" />
         <span className="text-[12px]">{openFaults} active fault{openFaults !== 1 ? 's' : ''}</span>
         <div className="h-4 w-px bg-border" />
@@ -66,7 +66,7 @@ export default function DeviceDashboard({
               { label: 'Zone', value: device.zone },
               { label: 'Type', value: device.type, capitalize: true },
               { label: 'Installed', value: device.installedDate },
-              { label: 'Deviation', value: `${anomalyPct}%` },
+              { label: 'Confidence', value: `${anomalyPct}%` },
               { label: 'Energy Waste', value: device.faults[0]?.energyWaste ?? '--' },
             ].map(s => (
               <div key={s.label} className="border border-border bg-card px-3 py-2">

@@ -64,7 +64,7 @@ const DeviceNode = ({ device, selected, onClick }: { device: Device; selected: b
           <div className="flex items-center gap-1.5 mt-1">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
             <span className="text-[11px] capitalize">{device.status}</span>
-            <span className="text-[11px] text-muted-foreground ml-1">Deviation: {formatAnomalyConfidence(device.anomalyScore)}</span>
+            <span className="text-[11px] text-muted-foreground ml-1">Confidence: {formatAnomalyConfidence(device.anomalyScore)}</span>
           </div>
         </div>
       </TooltipContent>
