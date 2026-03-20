@@ -1,6 +1,6 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import {
-  Zap, Clock, Wrench, Loader2, Activity, AlertTriangle, Shield, Server,
+  Clock, Wrench, Loader2, Activity, AlertTriangle, Shield, Server,
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import DeviceTelemetry from '@/components/TelemetryCharts';
@@ -61,13 +61,12 @@ export default function DeviceDashboard({
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
               { label: 'Zone', value: device.zone },
               { label: 'Type', value: device.type, capitalize: true },
               { label: 'Installed', value: device.installedDate },
               { label: 'Confidence', value: `${anomalyPct}%` },
-              { label: 'Energy Waste', value: device.faults[0]?.energyWaste ?? '--' },
             ].map(s => (
               <div key={s.label} className="border border-border bg-card px-3 py-2">
                 <div className="label-caps">{s.label}</div>
@@ -93,9 +92,7 @@ export default function DeviceDashboard({
                           <Wrench size={11} className="mt-0.5 shrink-0" />{f.recommendation}
                         </div>
                         <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><Zap size={10} />{f.energyWaste}</span>
                           <span className="flex items-center gap-1"><Clock size={10} />{fmtTs(f.detectedAt)}</span>
-                          <span>{f.estimatedImpact}</span>
                         </div>
                       </div>
                       <IssueResolveButton onClick={() => onOpenIssueResult({ device, fault: f })} />
