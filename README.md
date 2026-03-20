@@ -70,6 +70,11 @@ make help                 # list all targets
 ```
 
 
+## Bayesian network rendering (Python)
+
+![Bayesian network graph](docs/bayesian_network.png)
+
+
 ## Data pipeline
 
 ```mermaid
@@ -286,5 +291,3 @@ erDiagram
     backend_catalog_device_templates ||--o| backend_catalog_fault_meta : "impact metadata"
     backend_agent_meta ||--o{ backend_agent_audit_log : "audit log"
 ```
-
-
