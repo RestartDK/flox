@@ -8,7 +8,7 @@
 logs/
 FLAT.xml
 **/package-lock.json
-.nx/
+.turbo/
 .superset/
 ml/tensorboard/
 ml/data/processed/*

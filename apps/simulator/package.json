@@ -1,0 +1,8 @@
+{
+  "name": "@flox/simulator",
+  "private": true,
+  "scripts": {
+    "dev": "cd ../.. && PYTHONPATH=. uv run python apps/simulator/run.py",
+    "test": "cd ../.. && uv run pytest apps/simulator -v"
+  }
+}

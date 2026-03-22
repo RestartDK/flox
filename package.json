@@ -1,19 +1,31 @@
 {
-  "name": "ultiplate",
+  "name": "flox",
   "version": "0.1.0",
   "private": true,
   "packageManager": "bun@1.2.0",
+  "workspaces": [
+    "apps/webapp",
+    "apps/worker",
+    "apps/backend/fastapi",
+    "apps/simulator",
+    "ml",
+    "shacklib"
+  ],
   "scripts": {
-    "nx": "nx",
-    "graph": "nx graph",
-    "dev": "nx run webapp:dev",
-    "dev:stack": "nx run-many -t dev --projects=webapp,backend-fastapi,worker,ml --parallel=4",
-    "build": "nx run-many -t build --all",
-    "lint": "nx run-many -t lint --all",
-    "typecheck": "nx run-many -t typecheck --all",
-    "test": "nx run-many -t test --all"
+    "bootstrap": "uv sync && bun install",
+    "dev": "turbo run dev --filter=@flox/webapp",
+    "dev:stack": "turbo run dev --parallel --filter=@flox/webapp --filter=@flox/backend-fastapi --filter=@flox/worker --filter=@flox/ml",
+    "build": "turbo run build",
+    "lint": "turbo run lint --continue",
+    "typecheck": "turbo run typecheck --continue",
+    "test": "turbo run test --continue",
+    "etl": "turbo run etl --filter=@flox/ml",
+    "train": "turbo run train --filter=@flox/ml",
+    "fmt": "uv run black src/ ml/ apps/worker/ apps/backend/",
+    "compose:up": "docker compose up -d postgres redis backend-fastapi backend-classifier worker",
+    "compose:down": "docker compose down"
   },
   "devDependencies": {
-    "nx": "^20.8.2"
+    "turbo": "^2.5.4"
   }
 }

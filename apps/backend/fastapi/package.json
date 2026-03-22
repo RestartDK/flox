@@ -1,0 +1,11 @@
+{
+  "name": "@flox/backend-fastapi",
+  "private": true,
+  "scripts": {
+    "dev": "cd ../../.. && BACKEND_PORT=9812 PYTHONPATH=. uv run python apps/backend/fastapi/server.py",
+    "build": "cd ../../.. && uv run python -m compileall apps/backend/fastapi",
+    "lint": "cd ../../.. && uv run ruff check apps/backend/fastapi",
+    "typecheck": "cd ../../.. && uv run mypy apps/backend/fastapi",
+    "test": "cd ../../.. && uv run pytest apps/backend/fastapi -v"
+  }
+}
