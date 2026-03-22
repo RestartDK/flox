@@ -1,0 +1,32 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "typecheck": {},
+    "test": {},
+    "etl": {
+      "outputs": ["ml/data/processed/**"]
+    },
+    "train": {
+      "dependsOn": ["etl"],
+      "outputs": ["ml/models/weights/**", "ml/tensorboard/**"]
+    },
+    "classify": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

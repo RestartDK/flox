@@ -1,0 +1,10 @@
+{
+  "name": "@flox/shacklib",
+  "private": true,
+  "scripts": {
+    "build": "cd .. && uv run python -m compileall shacklib",
+    "lint": "cd .. && uv run ruff check shacklib",
+    "typecheck": "cd .. && uv run mypy shacklib",
+    "test": "cd .. && uv run pytest shacklib -v"
+  }
+}

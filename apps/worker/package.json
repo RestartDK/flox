@@ -1,0 +1,12 @@
+{
+  "name": "@flox/worker",
+  "private": true,
+  "scripts": {
+    "dev": "uv run celery -A worker:app worker --loglevel=info",
+    "classify": "uv run celery -A worker:app beat --loglevel=info",
+    "build": "cd ../.. && uv run python -m compileall apps/worker",
+    "lint": "cd ../.. && uv run ruff check apps/worker",
+    "typecheck": "cd ../.. && uv run mypy apps/worker",
+    "test": "cd ../.. && uv run pytest apps/worker -v"
+  }
+}
