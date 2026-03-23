@@ -3,19 +3,11 @@ import {
   resolveBackendBaseUrl,
 } from './backendConfig';
 
-const getRuntimeEnv = (): Record<string, string | boolean | undefined> => {
-  const withEnv = import.meta as ImportMeta & {
-    env?: Record<string, string | boolean | undefined>;
-  };
-  return withEnv.env ?? {};
-};
-
 export const getBackendBaseUrl = () => {
-  const env = getRuntimeEnv();
   return (
     resolveBackendBaseUrl({
-      explicitUrl: typeof env.VITE_BACKEND_URL === 'string' ? env.VITE_BACKEND_URL : undefined,
-      isProduction: Boolean(env.PROD),
+      explicitUrl: import.meta.env.VITE_BACKEND_URL,
+      isProduction: import.meta.env.PROD,
     }) ?? DEFAULT_PRODUCTION_BACKEND_URL
   );
 };
