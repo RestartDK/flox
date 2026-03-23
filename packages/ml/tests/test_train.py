@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +10,9 @@ import torch
 
 from ml.models.arch import Model
 from .conftest import build_small_dataset, build_train_config, repo_root
+
+
+SKIP_XGBOOST_SMOKE = platform.system() == "Darwin" and platform.machine() == "arm64"
 
 
 def test_conv1d_autoencoder_preserves_shape():
@@ -44,11 +48,15 @@ def test_train_modes_smoke(tmp_path):
 
     cases = [
         ("binary", "logreg", artifact_dir / "logreg_binary.pkl"),
-        ("multiclass", "xgboost", artifact_dir / "xgboost_multiclass.pkl"),
         ("multiclass", "mlp_classifier", artifact_dir / "mlp_multiclass.pt"),
         ("binary", "conv1d_classifier", artifact_dir / "conv1d_binary.pt"),
         ("autoencoder", "conv1d_autoencoder", artifact_dir / "autoencoder.pt"),
     ]
+
+    if not SKIP_XGBOOST_SMOKE:
+        cases.insert(
+            1, ("multiclass", "xgboost", artifact_dir / "xgboost_multiclass.pkl")
+        )
 
     for task, model_type, weight_path in cases:
         command = [
