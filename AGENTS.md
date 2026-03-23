@@ -10,8 +10,10 @@ apps/webapp-minimal/  Streamlit prototype (optional; not wired in this repo)
 apps/backend/fastapi/ FastAPI server
 apps/backend/flask/   Flask server
 apps/worker/          Celery worker (Redis broker)
+apps/ml-inference/    FastAPI ML inference deployable app
 apps/simulator/       Node simulator
-ml/                   PyTorch ML pipeline (arch, train, inference, etl)
+packages/ml/          Python ML package (inference, train, etl, simulation)
+ml/                   ML configs, datasets, weights, and deployment docs
 shacklib/             Shared Python library: logger, scraper, agent
 src/                  Simple scripts / CLI
 ```

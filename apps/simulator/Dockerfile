@@ -2,18 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Only the deps the simulator actually needs
-RUN pip install --no-cache-dir numpy pandas
+RUN pip install --no-cache-dir uv
 
-# Install shacklib as a package
+ENV UV_SYSTEM_PYTHON=1
+
+RUN uv pip install --system numpy pandas
+
 COPY pyproject.toml ./pyproject.toml
 COPY shacklib/ ./shacklib/
-RUN pip install --no-cache-dir --no-deps .
+RUN uv pip install --system --no-deps .
 
-# Bake the dataset into the image so it is fully self-sufficient
 COPY ml/data/anomaly_dataset.csv ./ml/data/anomaly_dataset.csv
-
-# Copy entrypoint
 COPY apps/simulator/ ./apps/simulator/
 
 ENV PYTHONPATH=/app

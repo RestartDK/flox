@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml"
+version = "0.1.0"
+description = "Flox ML package for inference, training, ETL, and simulation"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "influxdb-client",
+  "matplotlib",
+  "numpy",
+  "pandas",
+  "pydantic",
+  "pyyaml",
+  "requests",
+  "scikit-learn",
+  "scipy",
+  "tensorboard",
+  "torch",
+  "uvicorn[standard]",
+  "xgboost",
+]
+
+[dependency-groups]
+dev = [
+  "mypy",
+  "pytest",
+  "ruff",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ml*"]
+
+[tool.uv]
+default-groups = ["dev"]

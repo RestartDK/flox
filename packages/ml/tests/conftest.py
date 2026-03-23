@@ -13,10 +13,11 @@ from ml.data.etl import (
     resolve_real_data_path,
     write_outputs,
 )
+from ml.paths import repository_root
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return repository_root()
 
 
 def build_small_dataset(tmp_path: Path, seed: int = 11) -> dict[str, object]:

@@ -16,6 +16,7 @@ dependencies = [
   "flask",
   "flask-cors",
   "matplotlib",
+  "ml",
   "numpy",
   "pandas",
   "pydantic",
@@ -59,3 +60,6 @@ exclude = ["apps*", "ml*", "tests*"]
 
 [tool.uv]
 default-groups = ["dev"]
+
+[tool.uv.sources]
+ml = { path = "packages/ml", editable = true }

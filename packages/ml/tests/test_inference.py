@@ -9,6 +9,20 @@ import requests
 BASE_URL = "http://localhost:8200"
 
 
+def _service_available() -> bool:
+    try:
+        response = requests.get(f"{BASE_URL}/health", timeout=1)
+    except requests.RequestException:
+        return False
+    return response.ok
+
+
+pytestmark = pytest.mark.skipif(
+    not _service_available(),
+    reason="ml-inference service is not running on localhost:8200",
+)
+
+
 @pytest.fixture
 def api_base():
     """Base URL for API"""

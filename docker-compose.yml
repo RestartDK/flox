@@ -12,7 +12,7 @@ services:
     container_name: "${NAME}-backend-fastapi"
     build:
       context: ./
-      dockerfile: ./docker/fastapi.Dockerfile
+      dockerfile: ./apps/backend/fastapi/Dockerfile
     ports:
       - "${BACKEND_PORT:-5000}:5000"
     environment:
@@ -38,7 +38,7 @@ services:
     container_name: "${NAME}-backend-classifier"
     build:
       context: ./
-      dockerfile: ./docker/worker.Dockerfile
+      dockerfile: ./apps/worker/Dockerfile
     environment:
       - REDIS_URL=redis://redis:6379
       - PYTHONPATH=/app
@@ -60,13 +60,12 @@ services:
     profiles: ["ml"]
     build:
       context: ./
-      dockerfile: ./docker/ml.Dockerfile
+      dockerfile: ./apps/ml-inference/Dockerfile
     ports:
       - "8200:8000"
     environment:
       - ML_LATEST_WEIGHTS_PATH=${ML_LATEST_WEIGHTS_PATH:-}
       - ML_MODEL_FILE=${ML_MODEL_FILE:-}
-      - PYTHONPATH=${PYTHONPATH:-/app}
     volumes:
       - ./ml/models:/app/ml/models
       - ./.env:/app/.env
@@ -78,7 +77,7 @@ services:
     container_name: "${NAME}-worker"
     build:
       context: ./
-      dockerfile: ./docker/worker.Dockerfile
+      dockerfile: ./apps/worker/Dockerfile
     environment:
       - REDIS_URL=redis://redis:6379
       - PYTHONPATH=/app
@@ -99,7 +98,7 @@ services:
     profiles: ["sim"]
     build:
       context: ./
-      dockerfile: ./docker/simulator.Dockerfile
+      dockerfile: ./apps/simulator/Dockerfile
     environment:
       - SIM_BACKEND_URL=http://backend-fastapi:5000
       - SIM_NODE_ID=${SIM_NODE_ID:-BEL-VNT-003}

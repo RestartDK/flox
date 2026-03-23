@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from models.arch import Model
+from ml.models.arch import Model
+from ml.paths import repository_root
 
 
 class MLPClassifierInput(BaseModel):
@@ -152,7 +153,7 @@ class PredictionResponse(BaseModel):
 
 
 # Default weights path relative to the inference.py file location
-DEFAULT_WEIGHTS_PATH = str(Path(__file__).parent / "models" / "weights")
+DEFAULT_WEIGHTS_PATH = str(repository_root() / "ml" / "models" / "weights")
 
 weights_path = os.getenv("ML_LATEST_WEIGHTS_PATH", DEFAULT_WEIGHTS_PATH)
 model_file = os.getenv("ML_MODEL_FILE")
