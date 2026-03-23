@@ -25,7 +25,7 @@ COPY apps/worker/ ./worker/
 COPY src/ ./src/
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import redis; r=redis.from_url('redis://redis:6379'); r.ping()" || exit 1
+    CMD python -c "import os, redis; redis.from_url(os.environ['REDIS_URL']).ping()" || exit 1
 
 RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app /app

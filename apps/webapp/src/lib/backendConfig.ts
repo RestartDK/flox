@@ -1,6 +1,6 @@
 export const DEFAULT_DEV_BACKEND_PORT = "9812";
-export const DEFAULT_PRODUCTION_BACKEND_URL =
-  "https://starthack26-backend-production.up.railway.app";
+export const DEFAULT_DEV_BACKEND_URL = `http://localhost:${DEFAULT_DEV_BACKEND_PORT}`;
+export const DEFAULT_PRODUCTION_BACKEND_URL: string | undefined = undefined;
 
 type BackendBaseUrlOptions = {
   explicitUrl?: string;
@@ -8,8 +8,19 @@ type BackendBaseUrlOptions = {
 };
 
 export const resolveBackendBaseUrl = ({
-  explicitUrl: _explicitUrl,
-  isProduction: _isProduction,
+  explicitUrl,
+  isProduction,
 }: BackendBaseUrlOptions): string | undefined => {
-  return DEFAULT_PRODUCTION_BACKEND_URL;
+  const trimmedExplicitUrl = explicitUrl?.trim();
+  const normalizedExplicitUrl = trimmedExplicitUrl?.replace(/\/+$/, "");
+
+  if (normalizedExplicitUrl) {
+    return normalizedExplicitUrl;
+  }
+
+  if (isProduction) {
+    return DEFAULT_PRODUCTION_BACKEND_URL;
+  }
+
+  return DEFAULT_DEV_BACKEND_URL;
 };
