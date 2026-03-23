@@ -16,6 +16,8 @@ from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
+from ml.paths import repository_root
+
 
 RAW_TO_DISPLAY = {
     "normal": "Normal Operation",
@@ -102,9 +104,7 @@ def load_config(config_path: str) -> DataConfig:
         synthetic_csv_name=str(
             cfg.get("synthetic_csv_name", "synthetic_anomaly_dataset.csv")
         ),
-        realism_report_name=str(
-            cfg.get("realism_report_name", "realism_report.json")
-        ),
+        realism_report_name=str(cfg.get("realism_report_name", "realism_report.json")),
         metadata_name=str(cfg.get("metadata_name", "metadata.json")),
         seed=int(cfg.get("seed", 42)),
         runs_per_class=int(simulation.get("runs_per_class", 240)),
@@ -131,7 +131,7 @@ def resolve_real_data_path(config_path: str) -> Path:
     candidates = [
         raw,
         Path.cwd() / raw,
-        Path(__file__).resolve().parents[2] / raw,
+        repository_root() / raw,
     ]
     for candidate in candidates:
         resolved = candidate.resolve()
@@ -181,22 +181,32 @@ def ensure_pipe_air_features(
         )
         if "anomaly_type" in enriched.columns:
             anomaly_type = enriched["anomaly_type"].astype(str)
-            close_mask = anomaly_type.eq("bottle_stuck") & enriched["rotation_direction"].eq(0)
+            close_mask = anomaly_type.eq("bottle_stuck") & enriched[
+                "rotation_direction"
+            ].eq(0)
             gear_mask = anomaly_type.eq("gear_stuck")
             resistance_mask = anomaly_type.eq("resistance")
             stabbing_mask = anomaly_type.eq("stabbing")
-            air_flow = air_flow.where(~close_mask, air_flow * (0.78 - 0.18 * event_level))
-            air_flow = air_flow.where(~gear_mask, air_flow * (0.70 - 0.20 * event_level))
-            air_flow = air_flow.where(~resistance_mask, air_flow * (0.92 - 0.08 * event_level))
-            air_flow = air_flow.where(~stabbing_mask, air_flow + 0.55 * direction_change + 0.30 * event_level)
+            air_flow = air_flow.where(
+                ~close_mask, air_flow * (0.78 - 0.18 * event_level)
+            )
+            air_flow = air_flow.where(
+                ~gear_mask, air_flow * (0.70 - 0.20 * event_level)
+            )
+            air_flow = air_flow.where(
+                ~resistance_mask, air_flow * (0.92 - 0.08 * event_level)
+            )
+            air_flow = air_flow.where(
+                ~stabbing_mask, air_flow + 0.55 * direction_change + 0.30 * event_level
+            )
         air_flow += (
             enriched.groupby(group_col).cumcount().mod(11).astype(np.float64) - 5.0
         ) * 0.03
         enriched["pipe_air_flow_Lpm"] = air_flow.clip(lower=1.2)
     else:
-        enriched["pipe_air_flow_Lpm"] = enriched.groupby(group_col)["pipe_air_flow_Lpm"].transform(
-            lambda series: series.interpolate(limit_direction="both")
-        )
+        enriched["pipe_air_flow_Lpm"] = enriched.groupby(group_col)[
+            "pipe_air_flow_Lpm"
+        ].transform(lambda series: series.interpolate(limit_direction="both"))
         enriched["pipe_air_flow_Lpm"] = enriched["pipe_air_flow_Lpm"].fillna(
             enriched["pipe_air_flow_Lpm"].median()
         )
@@ -235,9 +245,9 @@ def ensure_pipe_air_features(
             "pipe_air_temperature_deg_C"
         ].fillna(enriched["pipe_air_temperature_deg_C"].median())
 
-    enriched["pipe_air_flow_ema_8"] = enriched.groupby(group_col)["pipe_air_flow_Lpm"].transform(
-        lambda series: group_ema(series, span=8)
-    )
+    enriched["pipe_air_flow_ema_8"] = enriched.groupby(group_col)[
+        "pipe_air_flow_Lpm"
+    ].transform(lambda series: group_ema(series, span=8))
     enriched["pipe_air_temperature_ema_8"] = enriched.groupby(group_col)[
         "pipe_air_temperature_deg_C"
     ].transform(lambda series: group_ema(series, span=8))
@@ -291,10 +301,9 @@ def prepare_dataframe(frame: pd.DataFrame, group_col: str) -> pd.DataFrame:
     )
     prepared["effective_step_s"] = prepared["effective_step_s"].fillna(median_step)
 
-    velocity = (
-        prepared.groupby(group_col)["feedback_position_%"].diff().fillna(0.0)
-        / prepared["effective_step_s"].replace(0.0, median_step)
-    )
+    velocity = prepared.groupby(group_col)["feedback_position_%"].diff().fillna(
+        0.0
+    ) / prepared["effective_step_s"].replace(0.0, median_step)
     prepared["velocity_pct_per_s"] = velocity.replace([np.inf, -np.inf], 0.0).fillna(
         0.0
     )
@@ -346,7 +355,9 @@ def windowed_records(
 
     sequence_windows = np.stack(sequences).astype(np.float32)
     tabular_features, tabular_feature_names = build_tabular_features(sequence_windows)
-    class_labels = np.array([CLASS_ORDER.index(slug) for slug in class_slugs], dtype=np.int64)
+    class_labels = np.array(
+        [CLASS_ORDER.index(slug) for slug in class_slugs], dtype=np.int64
+    )
     binary_array = np.array(binary_labels, dtype=np.int64)
 
     return {
@@ -361,7 +372,9 @@ def windowed_records(
     }
 
 
-def build_tabular_features(sequence_windows: np.ndarray) -> tuple[np.ndarray, list[str]]:
+def build_tabular_features(
+    sequence_windows: np.ndarray,
+) -> tuple[np.ndarray, list[str]]:
     tabular_blocks: list[np.ndarray] = []
     names: list[str] = []
 
@@ -483,7 +496,9 @@ def build_calibration_reference(
     global_summary = {
         "mean_power_W": float(real_frame["power_W"].mean()),
         "mean_abs_torque_Nmm": float(real_frame["abs_torque_Nmm"].mean()),
-        "median_abs_position_error_pct": float(real_frame["abs_position_error_pct"].median()),
+        "median_abs_position_error_pct": float(
+            real_frame["abs_position_error_pct"].median()
+        ),
         "mean_temperature_C": float(real_frame["internal_temperature_deg_C"].mean()),
     }
 
@@ -697,11 +712,7 @@ def burst_signal(
             continue
         rel = step_index - start
         phase = 2.0 * np.pi * burst["frequency"] * rel / max(burst["duration"], 1.0)
-        value += (
-            burst["amplitude"]
-            * np.sin(phase)
-            * np.exp(-burst["damping"] * rel)
-        )
+        value += burst["amplitude"] * np.sin(phase) * np.exp(-burst["damping"] * rel)
     return value
 
 
@@ -786,7 +797,9 @@ def simulate_run(
         min_duration=max(10, num_steps // 10),
         max_duration=max(18, num_steps // 3),
     )
-    blockage_bias = float(rng.uniform(0.55, 0.95)) if class_slug == "bottle_stuck" else 0.0
+    blockage_bias = (
+        float(rng.uniform(0.55, 0.95)) if class_slug == "bottle_stuck" else 0.0
+    )
 
     base_time = pd.Timestamp("2026-03-19 00:00:00+00:00") + pd.Timedelta(
         seconds=(run_index + 1) * 17
@@ -804,7 +817,11 @@ def simulate_run(
         setpoint = float(setpoints[step])
         error = setpoint - current_position
         command_velocity = float(
-            np.clip(error * float(profile["kp"]), -float(profile["max_speed"]), float(profile["max_speed"]))
+            np.clip(
+                error * float(profile["kp"]),
+                -float(profile["max_speed"]),
+                float(profile["max_speed"]),
+            )
         )
         event_level = float(event_envelope[step])
         actual_velocity = command_velocity * float(profile["tracking_gain"])
@@ -819,14 +836,20 @@ def simulate_run(
 
         if class_slug == "stabbing":
             poke_scale = 0.60 + 1.80 * event_level
-            actual_velocity = actual_velocity * (1.0 - 0.18 * event_level) + disturbance * poke_scale
+            actual_velocity = (
+                actual_velocity * (1.0 - 0.18 * event_level) + disturbance * poke_scale
+            )
             if rng.random() < 0.04 + 0.10 * event_level:
                 actual_velocity *= -0.35
             load_boost += abs(disturbance) * (0.06 + 0.14 * event_level)
             if rng.random() < 0.12 + 0.18 * event_level:
                 command_velocity *= float(rng.uniform(0.65, 1.15))
 
-        if class_slug == "bottle_stuck" and command_velocity < -0.4 and event_level > 0.12:
+        if (
+            class_slug == "bottle_stuck"
+            and command_velocity < -0.4
+            and event_level > 0.12
+        ):
             stall = blockage_bias * (0.55 + 0.35 * severity)
             actual_velocity *= max(0.003, 0.12 - 0.08 * event_level)
             if rng.random() < 0.20 + 0.35 * event_level:
@@ -834,7 +857,9 @@ def simulate_run(
             load_boost += 0.08 + 0.18 * event_level + abs(error) * 0.0025
 
         if class_slug == "gear_stuck" and event_level > 0.10:
-            jam_scale = min(0.16, float(profile["gear_residual"]) + 0.08 * (1.0 - event_level))
+            jam_scale = min(
+                0.16, float(profile["gear_residual"]) + 0.08 * (1.0 - event_level)
+            )
             actual_velocity *= jam_scale
             load_boost *= 0.30 + 0.25 * (1.0 - event_level)
             command_velocity *= 0.60 + 0.15 * (1.0 - event_level)
@@ -844,16 +869,22 @@ def simulate_run(
             actual_velocity = 0.82 * previous_velocity + 0.18 * actual_velocity
             drag = 0.10 + 0.26 * event_level + 0.08 * severity
             actual_velocity *= max(0.18, 1.0 - drag)
-            load_boost += 0.03 + 0.12 * event_level + abs(command_velocity) * 0.0015 + abs(error) * 0.0015
+            load_boost += (
+                0.03
+                + 0.12 * event_level
+                + abs(command_velocity) * 0.0015
+                + abs(error) * 0.0015
+            )
 
         acceleration = (actual_velocity - previous_velocity) / max(dt, 1e-4)
-        noisy_position = current_position + actual_velocity * dt + rng.normal(
-            0.0, float(profile["position_noise"])
+        noisy_position = (
+            current_position
+            + actual_velocity * dt
+            + rng.normal(0.0, float(profile["position_noise"]))
         )
-        measured_position = (
-            noisy_position * float(profile["sensor_position_scale"])
-            + float(profile["sensor_position_bias"])
-        )
+        measured_position = noisy_position * float(
+            profile["sensor_position_scale"]
+        ) + float(profile["sensor_position_bias"])
         current_position = float(np.clip(measured_position, 0.0, 100.0))
 
         effort = (
@@ -863,12 +894,13 @@ def simulate_run(
             + abs(acceleration) * 0.0008
             + load_boost
         )
-        sign = np.sign(command_velocity if abs(command_velocity) > 0.1 else actual_velocity)
+        sign = np.sign(
+            command_velocity if abs(command_velocity) > 0.1 else actual_velocity
+        )
         if sign == 0:
             sign = -1.0 if setpoint < current_position else 1.0
-        torque = (
-            sign * effort * float(profile["sensor_torque_scale"])
-            + rng.normal(0.0, 0.06 + 0.02 * event_level)
+        torque = sign * effort * float(profile["sensor_torque_scale"]) + rng.normal(
+            0.0, 0.06 + 0.02 * event_level
         )
 
         if class_slug == "gear_stuck" and event_level > 0.10:
@@ -889,13 +921,15 @@ def simulate_run(
         if class_slug == "gear_stuck" and event_level > 0.10:
             power = max(
                 0.0,
-                float(profile["base_power"]) + rng.normal(0.0, 0.004 + 0.004 * event_level),
+                float(profile["base_power"])
+                + rng.normal(0.0, 0.004 + 0.004 * event_level),
             )
         power = float(max(0.0, power * float(profile["sensor_power_scale"])))
 
         current_temp += dt * (
             float(profile["thermal_gain"]) * power
-            - float(profile["cooling_gain"]) * (current_temp - float(profile["ambient_temp"]))
+            - float(profile["cooling_gain"])
+            * (current_temp - float(profile["ambient_temp"]))
         ) + rng.normal(0.0, 0.008)
         measured_temp = current_temp + float(profile["sensor_temp_bias"])
 
@@ -909,7 +943,11 @@ def simulate_run(
         )
         if class_slug == "stabbing":
             pipe_air_flow += 0.35 * abs(disturbance) + 0.25 * event_level
-        elif class_slug == "bottle_stuck" and command_velocity < -0.4 and event_level > 0.12:
+        elif (
+            class_slug == "bottle_stuck"
+            and command_velocity < -0.4
+            and event_level > 0.12
+        ):
             pipe_air_flow *= max(0.52, 0.78 - 0.22 * event_level)
         elif class_slug == "gear_stuck" and event_level > 0.10:
             pipe_air_flow *= max(0.35, 0.55 - 0.18 * event_level)
@@ -931,9 +969,9 @@ def simulate_run(
             pipe_air_target += 0.22 * event_level
         elif class_slug == "gear_stuck":
             pipe_air_target -= 0.10 * (1.0 - event_level)
-        current_pipe_air_temp += 0.18 * (pipe_air_target - current_pipe_air_temp) + rng.normal(
-            0.0, 0.03
-        )
+        current_pipe_air_temp += 0.18 * (
+            pipe_air_target - current_pipe_air_temp
+        ) + rng.normal(0.0, 0.03)
 
         current_time += pd.Timedelta(seconds=dt)
         rows.append(
@@ -1004,11 +1042,17 @@ def calibrate_run_to_reference(
         -0.25,
         0.25,
     )
-    calibrated["feedback_position_%"] = calibrated["feedback_position_%"].clip(0.0, 100.0)
-    calibrated["setpoint_position_%"] = calibrated["setpoint_position_%"].clip(0.0, 100.0)
+    calibrated["feedback_position_%"] = calibrated["feedback_position_%"].clip(
+        0.0, 100.0
+    )
+    calibrated["setpoint_position_%"] = calibrated["setpoint_position_%"].clip(
+        0.0, 100.0
+    )
     calibrated["power_W"] = calibrated["power_W"].clip(lower=0.0)
     if "pipe_air_flow_Lpm" in calibrated.columns:
-        calibrated["pipe_air_flow_Lpm"] = calibrated["pipe_air_flow_Lpm"].clip(lower=1.0)
+        calibrated["pipe_air_flow_Lpm"] = calibrated["pipe_air_flow_Lpm"].clip(
+            lower=1.0
+        )
     return calibrated
 
 
@@ -1021,7 +1065,9 @@ def build_synthetic_frame(
     for class_slug in CLASS_ORDER:
         splits = split_assignments(config.runs_per_class, config, rng)
         for run_index, split in enumerate(splits):
-            global_index = CLASS_ORDER.index(class_slug) * config.runs_per_class + run_index
+            global_index = (
+                CLASS_ORDER.index(class_slug) * config.runs_per_class + run_index
+            )
             frames.append(
                 simulate_run(
                     class_slug=class_slug,
@@ -1047,7 +1093,9 @@ def compute_mmd_rbf(
     return float(xx.mean() + yy.mean() - 2.0 * xy.mean())
 
 
-def neighborhood_mixing(real_latent: np.ndarray, synthetic_latent: np.ndarray, k: int) -> dict[str, float]:
+def neighborhood_mixing(
+    real_latent: np.ndarray, synthetic_latent: np.ndarray, k: int
+) -> dict[str, float]:
     combined = np.vstack([real_latent, synthetic_latent])
     domain = np.array([0] * len(real_latent) + [1] * len(synthetic_latent))
     neighbors = NearestNeighbors(n_neighbors=min(k + 1, len(combined)))
@@ -1068,7 +1116,9 @@ def build_realism_report(
     real_tabular = reference.real_tabular_features
     synthetic_tabular = synthetic_windows["tabular_features"]
 
-    sample_count = min(config.max_report_samples, len(real_tabular), len(synthetic_tabular))
+    sample_count = min(
+        config.max_report_samples, len(real_tabular), len(synthetic_tabular)
+    )
     rng = np.random.default_rng(config.seed + 17)
     real_idx = rng.choice(len(real_tabular), size=sample_count, replace=False)
     synthetic_idx = rng.choice(len(synthetic_tabular), size=sample_count, replace=False)
@@ -1105,7 +1155,9 @@ def build_realism_report(
 
     real_latent = reference.pca.transform(real_scaled)
     synthetic_latent = reference.pca.transform(synthetic_scaled)
-    reference_pca = np.array(reference.summary["pca_explained_variance_ratio"], dtype=np.float64)
+    reference_pca = np.array(
+        reference.summary["pca_explained_variance_ratio"], dtype=np.float64
+    )
     synthetic_pca_ratio = synthetic_pca.explained_variance_ratio_[: len(reference_pca)]
     report = {
         "reference": reference.summary,
@@ -1143,7 +1195,11 @@ def build_dataset_blob(
     )
     split_indices = {
         split_name: torch.tensor(
-            [index for index, split in enumerate(windows["splits"]) if split == split_name],
+            [
+                index
+                for index, split in enumerate(windows["splits"])
+                if split == split_name
+            ],
             dtype=torch.long,
         )
         for split_name in ("train", "val", "test")
@@ -1158,7 +1214,8 @@ def build_dataset_blob(
         "sequence_window_size": config.window_size,
         "window_stride": config.window_stride,
         "split_window_counts": {
-            split_name: int(len(indices)) for split_name, indices in split_indices.items()
+            split_name: int(len(indices))
+            for split_name, indices in split_indices.items()
         },
         "row_count": int(len(synthetic_frame)),
         "run_count": int(synthetic_frame["run_id"].nunique()),
@@ -1167,13 +1224,21 @@ def build_dataset_blob(
     }
 
     blob = {
-        "sequence_windows": torch.tensor(windows["sequence_windows"], dtype=torch.float32),
+        "sequence_windows": torch.tensor(
+            windows["sequence_windows"], dtype=torch.float32
+        ),
         "sequence_binary_labels": torch.tensor(
             windows["binary_labels"], dtype=torch.long
         ),
-        "sequence_class_labels": torch.tensor(windows["class_labels"], dtype=torch.long),
-        "tabular_features": torch.tensor(windows["tabular_features"], dtype=torch.float32),
-        "tabular_binary_labels": torch.tensor(windows["binary_labels"], dtype=torch.long),
+        "sequence_class_labels": torch.tensor(
+            windows["class_labels"], dtype=torch.long
+        ),
+        "tabular_features": torch.tensor(
+            windows["tabular_features"], dtype=torch.float32
+        ),
+        "tabular_binary_labels": torch.tensor(
+            windows["binary_labels"], dtype=torch.long
+        ),
         "tabular_class_labels": torch.tensor(windows["class_labels"], dtype=torch.long),
         "feature_names": SEQUENCE_FEATURES,
         "tabular_feature_names": windows["tabular_feature_names"],

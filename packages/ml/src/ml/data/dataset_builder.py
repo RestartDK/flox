@@ -11,7 +11,7 @@ try:
     from influxdb_client import InfluxDBClient
 except ImportError as exc:
     raise SystemExit(
-        "Missing dependency 'influxdb-client'. Install it with `pip install influxdb-client`."
+        "Missing dependency 'influxdb-client'. Install it with `uv add influxdb-client --project packages/ml`."
     ) from exc
 
 

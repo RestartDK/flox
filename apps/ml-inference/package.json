@@ -1,0 +1,12 @@
+{
+  "name": "@flox/ml-inference",
+  "private": true,
+  "scripts": {
+    "dev": "cd ../.. && uv run --project packages/ml uvicorn ml.inference:app --host 0.0.0.0 --port 8000 --reload",
+    "start": "cd ../.. && uv run --project packages/ml uvicorn ml.inference:app --host 0.0.0.0 --port ${PORT:-8000}",
+    "build": "cd ../.. && uv run --project packages/ml python -m compileall packages/ml/src/ml",
+    "lint": "cd ../.. && uv run --project packages/ml ruff check packages/ml/src/ml packages/ml/tests apps/ml-inference",
+    "typecheck": "cd ../.. && uv run --project packages/ml mypy packages/ml/src/ml",
+    "test": "cd ../.. && uv run --project packages/ml pytest packages/ml/tests/test_inference.py -v"
+  }
+}

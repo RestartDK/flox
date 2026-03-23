@@ -4,7 +4,7 @@ This folder contains data utilities for ML workflows.
 
 ## Anomaly Dataset Collector
 
-`ml/data/dataset_builder.py` extends the streaming logic in `scripts/record.py` with labels for anomaly detection:
+`packages/ml/src/ml/data/dataset_builder.py` extends the streaming logic in `scripts/record.py` with labels for anomaly detection:
 
 - `anomaly_type` (string)
 - `is_anomaly` (0 or 1)
@@ -14,13 +14,13 @@ Use one recording run per condition you want to label (normal operation, sensor 
 ### 1) Collect a labeled session
 
 ```bash
-python -m ml.data.dataset_builder collect baseline-normal \
+uv run --project packages/ml python -m ml.data.dataset_builder collect baseline-normal \
   --anomaly-type normal \
   --is-anomaly 0
 ```
 
 ```bash
-python -m ml.data.dataset_builder collect manual-stiction \
+uv run --project packages/ml python -m ml.data.dataset_builder collect manual-stiction \
   --anomaly-type stabbing \
   --is-anomaly 1 \
   --rebuild-dataset
@@ -35,7 +35,7 @@ Useful options:
 ### 2) Build one combined training CSV
 
 ```bash
-python -m ml.data.dataset_builder build \
+uv run --project packages/ml python -m ml.data.dataset_builder build \
   --recordings-dir ml/data/processed/recordings \
   --output ml/data/processed/anomaly_dataset.csv
 ```

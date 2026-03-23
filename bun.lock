@@ -11,6 +11,9 @@
     "apps/backend/fastapi": {
       "name": "@flox/backend-fastapi",
     },
+    "apps/ml-inference": {
+      "name": "@flox/ml-inference",
+    },
     "apps/simulator": {
       "name": "@flox/simulator",
     },
@@ -100,7 +103,7 @@
     "apps/worker": {
       "name": "@flox/worker",
     },
-    "ml": {
+    "packages/ml": {
       "name": "@flox/ml",
     },
     "shacklib": {
@@ -198,7 +201,9 @@
 
     "@flox/backend-fastapi": ["@flox/backend-fastapi@workspace:apps/backend/fastapi"],
 
-    "@flox/ml": ["@flox/ml@workspace:ml"],
+    "@flox/ml": ["@flox/ml@workspace:packages/ml"],
+
+    "@flox/ml-inference": ["@flox/ml-inference@workspace:apps/ml-inference"],
 
     "@flox/shacklib": ["@flox/shacklib@workspace:shacklib"],
 

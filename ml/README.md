@@ -124,7 +124,7 @@ Response:
 
 #### With Docker Compose
 ```bash
-docker-compose --profile ml up ml-inference
+docker compose --profile ml up ml-inference
 ```
 
 The service will be available at `http://localhost:8200`
@@ -132,11 +132,10 @@ The service will be available at `http://localhost:8200`
 #### Testing
 ```bash
 # Run all inference tests
-cd ml
-python -m pytest tests/test_inference.py -v
+uv run --project packages/ml pytest packages/ml/tests/test_inference.py -v
 
 # Or run specific test
-python -m pytest tests/test_inference.py::test_health -v
+uv run --project packages/ml pytest packages/ml/tests/test_inference.py::test_health -v
 ```
 
 ### API Documentation
@@ -147,7 +146,7 @@ Interactive API documentation is automatically available at:
 
 ## Datacenter HVAC Simulation
 
-A minimal state-kernel simulation now lives in `ml/simulation/`.
+A minimal state-kernel simulation now lives in `packages/ml/src/ml/simulation/`.
 
 - 1D finite-difference airflow propagation along intake/supply/exhaust ducts
 - 2D finite-difference thermal propagation in three datacenter zones (rows A/B, C/D, E/F)
@@ -157,7 +156,7 @@ A minimal state-kernel simulation now lives in `ml/simulation/`.
 Run the baseline vs failure comparison with a minimal matplotlib output:
 
 ```bash
-python -m ml.simulation --scenario dmp_ef_stuck --duration 900
+uv run --project packages/ml python -m ml.simulation --scenario dmp_ef_stuck --duration 900
 ```
 
 Artifacts are written to `ml/simulation/artifacts/` by default:

@@ -1,0 +1,12 @@
+{
+  "name": "@flox/ml",
+  "private": true,
+  "scripts": {
+    "build": "cd ../.. && uv run --project packages/ml python -m compileall packages/ml/src/ml",
+    "etl": "cd ../.. && uv run --project packages/ml python -m ml.data.etl --config ml/configs/data/default.yaml --output ml/data/processed",
+    "train": "cd ../.. && uv run --project packages/ml python -m ml.models.train --config ml/configs/train/default.yaml --dataset ml/data/processed/dataset.pt --weights ml/models/weights/model.pt",
+    "lint": "cd ../.. && uv run --project packages/ml ruff check packages/ml/src/ml packages/ml/tests",
+    "typecheck": "cd ../.. && uv run --project packages/ml mypy packages/ml/src/ml",
+    "test": "cd ../.. && uv run --project packages/ml pytest packages/ml/tests -v"
+  }
+}

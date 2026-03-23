@@ -14,7 +14,7 @@ If no weights exist, train a model first:
 
 ```bash
 # Train MLP classifier (multiclass)
-python ml/models/train.py \
+uv run --project packages/ml python -m ml.models.train \
   --config ml/configs/train/default.yaml \
   --dataset ml/data/processed/dataset.pt \
   --task multiclass \
@@ -31,7 +31,7 @@ ls ml/models/weights/synthetic_benchmark/
 The service will automatically find and load the most recent `.pt` file:
 
 ```bash
-docker-compose --profile ml up ml-inference
+docker compose --profile ml up ml-inference
 ```
 
 The service searches:
@@ -48,7 +48,7 @@ ML_MODEL_FILE=/app/ml/models/weights/synthetic_benchmark/mlp_classifier_multicla
 
 # Or via environment variable
 export ML_MODEL_FILE=/app/ml/models/weights/synthetic_benchmark/mlp_classifier_multiclass.pt
-docker-compose --profile ml up ml-inference
+docker compose --profile ml up ml-inference
 ```
 
 ### 3. Verify Service
@@ -86,11 +86,10 @@ Pre-trained benchmark models in `ml/models/weights/synthetic_benchmark/`:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ML_LATEST_WEIGHTS_PATH` | No | `{inference.py dir}/models/weights` | Directory to search for model weights |
+| `ML_LATEST_WEIGHTS_PATH` | No | `<repo>/ml/models/weights` | Directory to search for model weights |
 | `ML_MODEL_FILE` | No | - | Specific model file to load (overrides auto-discovery) |
-| `PYTHONPATH` | No | `/app` | Python path for imports |
 
-**Note**: If `ML_LATEST_WEIGHTS_PATH` is not set, the service defaults to `models/weights` relative to the `inference.py` file location. This ensures the service works out-of-the-box in most deployment scenarios.
+**Note**: If `ML_LATEST_WEIGHTS_PATH` is not set, the service defaults to `ml/models/weights` relative to the repository root so the packaged inference app can still use the checked-in benchmark weights.
 
 ## Troubleshooting
 
@@ -99,7 +98,7 @@ Pre-trained benchmark models in `ml/models/weights/synthetic_benchmark/`:
 **Cause**: No trained models exist in the weights directory.
 
 **Solution**:
-1. Train a model using `ml/models/train.py`
+1. Train a model using `uv run --project packages/ml python -m ml.models.train`
 2. Or use existing benchmark weights by setting:
    ```bash
    ML_MODEL_FILE=/app/ml/models/weights/synthetic_benchmark/mlp_classifier_multiclass.pt
@@ -125,7 +124,7 @@ Then use the appropriate endpoint:
 
 **Solution**: Check logs:
 ```bash
-docker-compose logs ml-inference
+docker compose logs ml-inference
 ```
 
 ## Testing
@@ -134,10 +133,10 @@ Run the automated test suite:
 
 ```bash
 # Make sure service is running first
-docker-compose --profile ml up -d ml-inference
+docker compose --profile ml up -d ml-inference
 
 # Run tests
-python ml/test_inference.py
+uv run --project packages/ml pytest packages/ml/tests/test_inference.py -v
 ```
 
 ## Production Considerations
@@ -152,7 +151,7 @@ python ml/test_inference.py
 
 3. **Monitoring**: Enable request logging via uvicorn configuration
 
-4. **Resource limits**: Add to docker-compose.yml:
+4. **Resource limits**: Add to `docker-compose.yml`:
    ```yaml
    deploy:
      resources:

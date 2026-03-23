@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 
 from ml.models.arch import Model
-from ml.tests.conftest import build_small_dataset, build_train_config, repo_root
+from .conftest import build_small_dataset, build_train_config, repo_root
 
 
 def test_conv1d_autoencoder_preserves_shape():
