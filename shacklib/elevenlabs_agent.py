@@ -211,7 +211,10 @@ def escalate_fault(
     response dict with keys: ok, conversationId, callSid.
     """
     base = (
-        backend_url or os.getenv("VITE_BACKEND_URL") or _DEFAULT_BACKEND_URL
+        backend_url
+        or os.getenv("BACKEND_PUBLIC_URL")
+        or os.getenv("VITE_BACKEND_URL")
+        or _DEFAULT_BACKEND_URL
     ).rstrip("/")
     url = f"{base}/api/voice/elevenlabs/outbound-call"
     body = json.dumps(fault_spec).encode()

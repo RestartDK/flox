@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
@@ -11,22 +11,27 @@ const DEFAULT_DEV_FRONTEND_PORT = 3000;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
   const backendTarget =
     resolveBackendBaseUrl({
-      explicitUrl: undefined,
+      explicitUrl: env.VITE_BACKEND_URL,
       isProduction: mode === "production",
     }) || DEFAULT_PRODUCTION_BACKEND_URL;
+
+  const proxy = backendTarget
+    ? {
+        "/api": {
+          target: backendTarget,
+          changeOrigin: true,
+        },
+      }
+    : undefined;
 
   return {
     server: {
       host: "::",
       port: DEFAULT_DEV_FRONTEND_PORT,
-      proxy: {
-        "/api": {
-          target: backendTarget,
-          changeOrigin: true,
-        },
-      },
+      proxy,
       hmr: {
         overlay: false,
       },
@@ -34,12 +39,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       host: "0.0.0.0",
       allowedHosts: true,
-      proxy: {
-        "/api": {
-          target: backendTarget,
-          changeOrigin: true,
-        },
-      },
+      proxy,
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
